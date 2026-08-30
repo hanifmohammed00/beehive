@@ -6,6 +6,8 @@ parallel where safe, and gate every wave behind an independent review and a
 real end-to-end verification — autonomously, with a completion estimate
 after each wave.
 
+MIT-licensed. Vendor `PROTOCOL.md`, `ROLES.md`, `ADAPTERS.md` into any repo.
+
 Works with Claude Code, Codex (CLI or Cloud), Cursor, Aider, or a human
 coordinating several agent sessions. All state is plain files in the target
 repo's `.beehive/` directory, so any agent on any platform can resume a run.

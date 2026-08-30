@@ -62,4 +62,5 @@ state under `.beehive/` and a pointer in its `CLAUDE.md`.
 ## Install / use
 
 `README.md` has it. Short version: `ln -s "$(pwd)" ~/.claude/skills/beehive`
-then `/beehive` in any project. Git repo since 2026-08-30; no remote yet.
+then `/beehive` in any project. Public repo:
+`github.com/hanifmohammed00/beehive` (MIT). `v0.2` tagged.
