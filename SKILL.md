@@ -30,10 +30,11 @@ create it — starting points for `config.yml`, `brief.md`, and
   (`PROTOCOL.md` §Resuming): newest `wave-*/report.md`, `status`,
   `progress.md`. Continue from there. No `phase-spec.md` → start at intake.
 - **`intake`** — run `ROLES.md` §Interviewer against `.beehive/brief.md`
-  (create it with the user first if missing). Produces `phase-spec.md`
-  (with a contracts-first Phase 0), `config.yml`, and `digest.md`. Ends by
-  setting `mode:` from the "read the plan or just build?" question (default
-  `autobuild`).
+  (create it with the user first if missing). If `.beehive/` still holds a
+  completed/abandoned prior run, archive it to `.beehive/archive/<feature>/`
+  first. Produces `phase-spec.md` (with a contracts-first Phase 0),
+  `config.yml`, and `digest.md`. Ends by setting `mode:` from the "read the
+  plan or just build?" question (default `autobuild`).
 - **`plan`** — `PROTOCOL.md` §ACT 2: partition `config.yml`'s `spec` into
   waves, write `.beehive/wave-plan.md`.
 - **`build`** — `PROTOCOL.md` §ACT 3 wave by wave. `mode: autobuild`

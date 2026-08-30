@@ -1,8 +1,9 @@
 # Example — wells-frogo "Reallocate" feature
 
-First real Beehive run. Lives in the `wells-frogo` repo at `.beehive/`
-(`brief.md`, `phase-spec.md`, `wave-plan.md`, `progress.md`), spec of record
-`reallocate-spec.md`.
+Planning-only retrospective, written against a **pre-protocol** draft (the
+feature was built outside Beehive). For a real end-to-end run see
+`wells-frogo-diversify-search.md`. Kept for one lesson the other example
+doesn't show: how `hot_files` cap parallelism.
 
 Shape of it:
 
@@ -18,10 +19,9 @@ Takeaway: parallelism is bounded by hot files, not by how many phases have
 their dependencies met. Three "ready" phases that all edit one 3,000-line
 file still run one per wave.
 
-This run predates v0.2. What v0.2 would have changed:
-- A **Phase 0** landing the shared `schemas.py` request fields + the
-  `_credit_cash`/`_debit_cash` signatures, so P3/P4/P5 depend on P0 only.
-- P3 + P4 **merged into one phase** (both were serialized purely by the
-  `main.py` + `schemas.py` + `DiversifyFlow.tsx` collision).
-- Result: P0 alone → {P1, P2, P3+4} in one wave → P5 → P6. ~6 serial units
-  drop to ~4, and the middle wave runs 3-wide.
+The fix the protocol prescribes: a **Phase 0** landing the shared
+`schemas.py` fields + `_credit_cash`/`_debit_cash` signatures so P3/P4/P5
+depend on P0 only, and **merging** P3+P4 (serialized purely by the shared
+hot files) into one phase for one Builder. That turns P0 → {P1, P2, P3+4}
+→ P5 → P6 — ~6 serial units down to ~4, middle wave 3-wide. §Speed
+levers 1–3.

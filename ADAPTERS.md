@@ -14,9 +14,23 @@ parallel Builders. Everything else is plain git + shell + files.
 - **Builder**: `Agent` tool, `subagent_type: general-purpose`, one call per
   phase. Parallel builders in one wave → `isolation: "worktree"` +
   `run_in_background: true`, then collect. `model: {models.strong}`.
+  - If `isolation: "worktree"` isn't available (it needs VCS hooks the
+    environment may not have), fall back to **manual worktrees**: the
+    Coordinator runs `git worktree add -b wave-N/phase-K <dir> <base>` per
+    phase and passes each Builder its `<dir>`. Symlink the gitignored build
+    deps into each worktree first (`ln -s <repo>/backend/.venv <dir>/backend/.venv`,
+    same for `node_modules`) or tests won't run. Background subagents are
+    still fresh contexts, so isolation holds. Remove the worktrees
+    (`git worktree remove --force`) and delete the merged branches after
+    each wave.
+  - **Resuming a dead Builder**: `SendMessage` to the same subagent — its
+    context and its partial work on the branch are intact. A fresh `Agent`
+    call starts cold and re-explores; only do that if the transcript is
+    gone.
 - **Reviewer / Verifier**: a new `Agent` call — a fresh subagent starts cold,
   which satisfies isolation. Never reuse a builder subagent for review.
-  Verifier and light-gate Reviewer take `model: {models.cheap}`.
+  Verifier and light-gate Reviewer take `model: {models.cheap}`. Point them
+  at `wave-N-int` (the integration branch) / its diff.
 - **Concurrent tests**: run the `config.test` commands as parallel
   background `Bash` calls, then read both results.
 - **Heavy review**: the human runs `config.heavy_review` (e.g.
@@ -28,8 +42,8 @@ parallel Builders. Everything else is plain git + shell + files.
 - **Builder**: `codex exec` per phase, sequential, prompt = `ROLES.md`
   §Builder with slots filled. Each writes its own branch.
 - **Reviewer / Verifier**: a *separate* `codex exec` run pointed at the
-  diff (`git diff main...wave-N`) — new process, no shared context, so
-  isolation holds. Prompt from `ROLES.md`.
+  diff (`git diff <working-branch>...wave-N-int`) — new process, no shared
+  context, so isolation holds. Prompt from `ROLES.md`.
 - **Parallel**: not native; the human can launch multiple Codex Cloud tasks
   (below) for one wave's phases and merge the branches.
 

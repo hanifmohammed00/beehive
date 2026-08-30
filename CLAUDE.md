@@ -27,7 +27,7 @@ state under `.beehive/` and a pointer in its `CLAUDE.md`.
 | `SKILL.md` | Claude Code skill entry (`/beehive`), `name: beehive` | Thin dispatch wrapper; points at `PROTOCOL.md` |
 | `README.md` | Human-facing: what it is, install, bootstrap | Keep in sync with `PROTOCOL.md` at a summary level |
 | `templates/` | Starting `config.yml` / `brief.md` / `phase-spec.md` for a target repo's `.beehive/` | `config.yml` lists exactly the keys `PROTOCOL.md` §config.yml defines; `phase-spec.md` the fields §Input contract defines |
-| `examples/` | Worked examples (currently the wells-frogo reallocate run) | Illustrative, not normative |
+| `examples/` | Worked examples — `wells-frogo-diversify-search.md` (the first real v0.3 run, norm-shaped), `wells-frogo-reallocate.md` (pre-protocol retrospective) | Illustrative, not normative |
 | `LICENSE` | MIT | — |
 | `CLAUDE.md` | This file | Orientation only |
 
@@ -52,15 +52,17 @@ state under `.beehive/` and a pointer in its `CLAUDE.md`.
 
 - Change `PROTOCOL.md` first, then propagate to `ROLES.md` / `SKILL.md` /
   `README.md` / `templates/`. Grep for the term you changed.
-- Keep the version line at the top of `PROTOCOL.md` current (`v0.2` now).
-  Bump minor for a new rule or field; note what changed in a one-liner.
+- Keep the version line at the top of `PROTOCOL.md` current (`v0.3` now).
+  Bump minor for a new rule or field; note what changed in the `<!-- -->`
+  comment under the version line.
 - Step numbers in `PROTOCOL.md` §ACT 3 are referenced from `ROLES.md` and
   §Speed — if you renumber, fix the references.
 - There's nothing to run. To actually test a change, use `/beehive` on a
-  real feature in a real repo and watch where it goes wrong.
+  real feature in a real repo and watch where it goes wrong — the v0.3
+  changes all came from doing exactly that (`examples/wells-frogo-diversify-search.md`).
 
 ## Install / use
 
 `README.md` has it. Short version: `ln -s "$(pwd)" ~/.claude/skills/beehive`
 then `/beehive` in any project. Public repo:
-`github.com/hanifmohammed00/beehive` (MIT). `v0.2` tagged.
+`github.com/hanifmohammed00/beehive` (MIT). `v0.3` current.

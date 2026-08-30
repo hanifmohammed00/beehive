@@ -64,12 +64,14 @@ obeys `PROTOCOL.md` §Economy.
 > `{spec}` and `{hot_files}`. Write `.beehive/wave-plan.md`.
 >
 > Act 3, per wave: drive it exactly as `PROTOCOL.md` §ACT 3 specifies —
-> spawn all the wave's Builders concurrently (step 1), integrate, run the
-> `config.test` commands concurrently (step 3), then Review/Verify at the
-> depth the wave's `gate` demands (step 4). Keep `.beehive/wave-N/status`
-> current. Wave report starts with the front-matter block in §ACT 3 step 5,
-> then the prose body — nothing added. After each wave: patch `digest.md`
-> with what changed, update `.beehive/progress.md` per §Progress.
+> spawn all the wave's Builders concurrently (step 1), integrate the phase
+> branches to `wave-N-int` (step 2), run the `config.test` commands
+> concurrently (step 3), then Review/Verify at the depth the wave's `gate`
+> demands (step 4). Keep `.beehive/wave-N/status` current. A Builder that
+> dies mid-phase is *resumed* with its context, not cold-restarted. Wave
+> report starts with the front-matter block in §ACT 3 step 5, then the
+> prose body — nothing added. After each wave: patch `digest.md` with what
+> changed, update `.beehive/progress.md` per §Progress.
 >
 > In `mode: autobuild`: never stop between phases or waves for permission —
 > the report + progress line are the notification. Once a wave passes the
@@ -106,7 +108,9 @@ obeys `PROTOCOL.md` §Economy.
 >
 > Write `.beehive/wave-{W}/build/phase-{N}.md`, ≤15 lines: what changed,
 > any deviation from the spec and why, new files, one line the reviewer
-> needs.
+> needs. Anything you defer must be a `ponytail:` comment or an item in a
+> later phase's spec — a build-note line alone is not tracking, and Review
+> will flag it.
 
 ---
 
@@ -114,8 +118,8 @@ obeys `PROTOCOL.md` §Economy.
 
 > You are reviewing a diff you did not write and must not have seen being
 > written. Read `{spec}`, `.beehive/digest.md`, and `git diff
-> main...wave-{W}` — the diff, not the full source of every touched file.
-> Do not edit.
+> <working-branch>...wave-{W}-int` — the diff, not the full source of every
+> touched file. Do not edit.
 >
 > Check: every phase `deliverable` present and matching the spec; every
 > guard or invariant the spec names is enforced; shared helpers have
@@ -131,13 +135,16 @@ obeys `PROTOCOL.md` §Economy.
 
 ## Verifier
 
-> Clean-checkout branch `wave-{W}`. You must not have seen the code being
+> Clean-checkout branch `wave-{W}-int`. You must not have seen the code being
 > written. Read `.beehive/digest.md` and the wave's phases in `{spec}` for
 > what to exercise.
 >
 > Run every `{test}` command — paste raw output. Run `{boot}` and exercise
 > the real user-facing paths this wave added (list them from `{spec}`).
-> Confirm the feature works end to end, not just that unit tests pass.
+> Confirm the feature works end to end, not just that unit tests pass. A
+> clean checkout has no runtime state (no dev DB, no local fixtures beyond
+> what's committed) — seed what you need from the test fixtures or a
+> documented import path; never point the app at the user's real data.
 >
 > Write `.beehive/wave-{W}/verify.md`: pass/fail verdict, then the
 > evidence — commands run, output, HTTP responses or screenshots. Evidence,

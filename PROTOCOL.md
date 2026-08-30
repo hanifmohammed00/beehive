@@ -1,4 +1,9 @@
-# Beehive Protocol v0.2
+# Beehive Protocol v0.3
+
+<!-- v0.3: first real run (wells-frogo diversify-search, examples/). Branch
+     names deconflicted (wave-N-int); Phase 0 gate depth by whether it lands
+     behaviour; resume-a-dead-builder rule; deferrals must be tracked;
+     archive a prior run; Verifier seeds its own data. -->
 
 A platform-neutral method for taking a feature from a messy brain-dump to
 merged code: interview the human into a spec, partition the spec into waves
@@ -67,8 +72,12 @@ correct me` inline, so the human fixes it in review, not in more Q&A.
 
 The Interviewer's first job after drafting phases is to **pull every shared
 type, schema, interface, DB migration, and function signature that two or
-more later phases need into a single Phase 0** (`weight` usually 1–2, `gate:
-full` because everything depends on it). Later phases then `depends_on: [0]`
+more later phases need into a single Phase 0** (`weight` usually 1–2). Gate
+it by what it actually lands: `gate: full` when Phase 0 carries real
+behaviour (a migration that runs, a shared function with logic); `gate:
+standard` when it is a behaviour-preserving extraction or a signature-only
+stub — the test gate plus a fresh Reviewer already prove an extraction, and
+a Verifier boot would exercise nothing new. Later phases then `depends_on: [0]`
 instead of on each other, so the partition fans them out into one wave
 instead of a chain. This is the highest-leverage speed move — do it
 aggressively. A phase that still must depend on another phase's *behaviour*
@@ -181,15 +190,21 @@ verify | blocked | merged` — so a resuming agent knows where the wave stopped.
 
 1. **Build (concurrent)** — spawn **all** of the wave's Builders at once
    (`ROLES.md` §Builder), each on branch `wave-N/phase-K`, each in its own
-   worktree/checkout. The Coordinator does not block on one before starting
-   the next — it launches them, then collects. A single-phase wave is just
-   one Builder. Builder writes `.beehive/wave-N/build/phase-K.md` (≤15
-   lines: what changed, deviations, new files). While iterating, a Builder
-   runs `config.test_quick` (fast subset); the full suite is the gate's job.
+   worktree/checkout (`ADAPTERS.md` for the mechanics — and for making the
+   gitignored deps a build needs, like a venv or `node_modules`, present in
+   each worktree). The Coordinator does not block on one before starting the
+   next — it launches them, then collects. A single-phase wave is just one
+   Builder. Builder writes `.beehive/wave-N/build/phase-K.md` (≤15 lines:
+   what changed, deviations, new files). While iterating, a Builder runs
+   `config.test_quick` (fast subset); the full suite is the gate's job.
    **3-strike rule:** a Builder that can't get its own tests green after 3
    attempts stops and reports — the Coordinator reassigns or escalates,
-   rather than letting it burn tokens flailing.
-2. **Integrate** — Coordinator merges phase branches → branch `wave-N`.
+   rather than letting it burn tokens flailing. **A Builder that dies
+   mid-phase** (crash, rate limit, timeout) is *resumed* with its context
+   intact, never cold-restarted — its partial work is on its branch, and a
+   cold agent would re-explore and re-derive it.
+2. **Integrate** — Coordinator merges phase branches → branch `wave-N-int`
+   (not `wave-N` — that collides with the `wave-N/phase-K` refs).
    Resolves conflicts. A conflict that shows two phases disagreed on an
    interface is a Phase 0 gap: fix it, record it in the wave report.
 3. **Test gate** — Coordinator runs the `config.test` commands (full suite),
@@ -202,13 +217,17 @@ verify | blocked | merged` — so a resuming agent knows where the wave stopped.
    **deepest** gate among the wave's phases:
    - `light` — Coordinator eyeballs the diff against `phase-spec.md`. No
      separate agent. No boot.
-   - `standard` — fresh Reviewer on `git diff main...wave-N` (`ROLES.md`
-     §Reviewer) → `.beehive/wave-N/review.md`. No separate Verifier; the
-     test gate stands in.
+   - `standard` — fresh Reviewer on `git diff <working-branch>...wave-N-int`
+     (`ROLES.md` §Reviewer) → `.beehive/wave-N/review.md`. No separate
+     Verifier; the test gate stands in.
    - `full` — Reviewer **and** a fresh Verifier (`ROLES.md` §Verifier):
      clean checkout, `config.test`, `config.boot`, exercise the real
-     user-facing paths → `.beehive/wave-N/verify.md`.
-   Any finding above trivial → Builder → back to step 3.
+     user-facing paths → `.beehive/wave-N/verify.md`. A clean checkout has
+     no runtime state — the Verifier seeds what it needs from fixtures or a
+     documented import, never the user's live data.
+   Any finding above trivial → Builder → back to step 3. A **scoped**
+   frontend-or-copy-only fix can be re-checked by the Reviewer alone rather
+   than a second full Verifier pass, if the substance already verified.
 5. **Gate** — Coordinator writes `.beehive/wave-N/report.md`, starting with
    a parseable front-matter block, then the prose body:
    ```
@@ -224,12 +243,12 @@ verify | blocked | merged` — so a resuming agent knows where the wave stopped.
    resolutions, verify verdict (if run). Names `config.heavy_review` as the
    human's optional deep check. Patches `digest.md` with what changed
    (§digest). Updates `.beehive/progress.md` (§Progress).
-   `mode: autobuild` → merge `wave-N` to the working branch (it passed the
-   test gate), then start wave N+1's **Build** immediately while this wave's
-   Review+Verify run *in parallel* — they don't edit code, so a finding
-   just feeds back as a fix on the already-merged phase. Guard: if wave N
-   has a `full` gate, N+1 may **build** in parallel but must not **merge**
-   until N's Verify passes — so nothing compounds on an unverified
+   `mode: autobuild` → merge `wave-N-int` to the working branch (it passed
+   the test gate), then start wave N+1's **Build** immediately while this
+   wave's Review+Verify run *in parallel* — they don't edit code, so a
+   finding just feeds back as a fix on the already-merged phase. Guard: if
+   wave N has a `full` gate, N+1 may **build** in parallel but must not
+   **merge** until N's Verify passes — so nothing compounds on an unverified
    foundation. Stop only on an unrecoverable block. `mode: review` → wait
    for approval.
 
@@ -295,7 +314,11 @@ Levers, in the order they pay off:
    back-to-back.
 9. **Model tiering** (`config.models`) — strong model for Coordinator,
    Builders, and full-gate Reviewers; a cheaper/faster one for the Verifier
-   and light-gate Reviewers, which mostly run commands and report.
+   and light-gate Reviewers, which mostly run commands and report. On a
+   metered plan, tiering and wave width are also a *budget* lever: N
+   concurrent Builders burn ~N× the token rate, and hitting a rate limit
+   mid-wave costs more time than it saved. Widen the graph at spec time;
+   don't necessarily run the whole width at once.
 
 What does **not** help: adding builders to an existing chain (they idle),
 or "build everything then review once at the end" (late-caught foundation
@@ -323,8 +346,9 @@ report, not volume.
   Roles read `.beehive/digest.md` for repo context — one shared exploration,
   not one per agent. A Builder additionally opens the specific files in its
   `touches`; it does not take a repo tour. `config.context` stays short.
-- **Reviewer sees the diff, not the files.** `git diff main...wave-N`, plus
-  `digest.md` and the spec — never the full source of every touched file.
+- **Reviewer sees the diff, not the files.** `git diff
+  <working-branch>...wave-N-int`, plus `digest.md` and the spec — never the
+  full source of every touched file.
 - **Notes are bounded.** Builder note ≤15 lines. Reviewer findings are
   one-liners: `severity · file:line · problem · fix` — never restate the
   spec back. Verifier gives evidence, not narrative. Wave report is the
@@ -341,6 +365,10 @@ report, not volume.
 - **Mark shortcuts, don't argue them.** A deliberate simplification gets a
   `ponytail:` comment naming the ceiling and the upgrade path, so Review
   doesn't re-litigate it: `# ponytail: single cash pool, per-account later`.
+- **A deferral must land somewhere tracked** — a `ponytail:` comment or an
+  item added to a later phase's spec. "Deferred to Phase 3" in a build note,
+  with nothing in Phase 3, is an *untracked* deferral; the Reviewer treats
+  it as a finding.
 - **Never lazy about:** trust-boundary validation, error handling that
   prevents data loss, security, accessibility basics, atomicity the spec
   requires, or anything the spec explicitly asks for.
@@ -366,6 +394,10 @@ report, not volume.
 ---
 
 ## Resuming
+
+The protocol assumes **one active run per `.beehive/`**. If `.beehive/` holds
+a completed or abandoned prior run, archive it to `.beehive/archive/<feature>/`
+before starting a new one.
 
 No `phase-spec.md` yet → resume Act 1: if `.beehive/questions.md` holds the
 human's answers, feed them to the Interviewer for its next round; otherwise

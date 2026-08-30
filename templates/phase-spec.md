@@ -22,7 +22,8 @@ atomic commit per apply, etc. State them once here, not in every phase.>
 - **depends_on**: none
 - **tests**: types compile / import cleanly; migration applies and reverts.
 - **weight**: 2
-- **gate**: full        # everything depends on Phase 0
+- **gate**: full        # full if Phase 0 lands behaviour; standard if it's a
+                        # behaviour-preserving extraction / signature-only stub
 
 ## Phase 1 — <name>
 
