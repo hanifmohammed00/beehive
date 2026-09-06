@@ -65,5 +65,10 @@ Vendor `PROTOCOL.md`, `ROLES.md`, `ADAPTERS.md` into the repo (e.g. under
    re-exploring), and asks whether to just build or let you review first.
 4. It partitions into waves and builds — Builders in a wave run
    concurrently, gates are as deep as each phase's risk warrants, and the
-   next wave's build overlaps the current wave's review. Reports after each
-   wave; writes a completion percent to `.beehive/progress.md`.
+   next wave's build overlaps the current wave's review. A phase whose
+   approach rests on unverified real-world behaviour is spiked against real
+   data before the full build, so a wrong design is caught at spec time, not
+   after a full review-and-verify cycle. Reports after each wave; writes a
+   completion percent to `.beehive/progress.md`. In the default `autobuild`
+   mode it never stops to ask you to approve or start a wave — it just keeps
+   going, halting only on an unrecoverable block.

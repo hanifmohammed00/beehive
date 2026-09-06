@@ -39,17 +39,24 @@ create it — starting points for `config.yml`, `brief.md`, and
   waves, write `.beehive/wave-plan.md`.
 - **`build`** — `PROTOCOL.md` §ACT 3 wave by wave. `mode: autobuild`
   (default) runs every phase and wave to completion without stopping for
-  permission, updating `.beehive/progress.md` after each wave, stopping
-  only on an unrecoverable block. `mode: review` also stops for approval
-  at each gate.
+  permission and without ever asking the user to confirm or "activate" the
+  next wave — it just starts it — updating `.beehive/progress.md` after each
+  wave, stopping only on an unrecoverable block. `mode: review` also stops
+  for approval at each gate.
 
 ## Non-negotiable
 
 - Obey `PROTOCOL.md` §Economy and §Invariant rules — Reviewer and Verifier
   are always fresh subagents, never a Builder; Builders get only their
   phase's scope; test output is pasted raw; two phases sharing a `hot_file`
-  never share a wave.
+  never share a wave; a `risk: empirical` phase spikes before it builds;
+  fix findings go back to the same Builder warm; the Verifier and light-gate
+  Reviewers run on `models.cheap`.
 - The Coordinator does not write feature code — only merges, test runs,
   reports, progress, and doc edits.
 - Never invoke `config.yml` `heavy_review` — name it in the wave report for
   the user to run.
+- In `autobuild`, do not pause the run to ask the user anything except when
+  reporting an unrecoverable block. Spawning the next wave's Builders needs
+  no sign-off; the wave report is posted and the run continues in the same
+  turn.
