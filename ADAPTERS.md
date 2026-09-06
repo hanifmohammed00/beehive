@@ -13,7 +13,13 @@ parallel Builders. Everything else is plain git + shell + files.
   `config.yml` and runs the Coordinator role).
 - **Builder**: `Agent` tool, `subagent_type: general-purpose`, one call per
   phase. Parallel builders in one wave → `isolation: "worktree"` +
-  `run_in_background: true`, then collect. `model: {models.strong}`.
+  `run_in_background: true`, then collect. `model: {models.strong}`. On a
+  metered plan, dispatch ~2–3 at a time rather than the whole wave width — a
+  rate-limit mid-wave costs more than the parallelism saved, and a
+  rate-limited Reviewer/Verifier (no artifact until it finishes) is a total
+  loss paid twice.
+  - A `risk: empirical` phase: the Builder's first deliverable is the spike
+    script + `.beehive/wave-N/spike-K.md`, before the real build.
   - If `isolation: "worktree"` isn't available (it needs VCS hooks the
     environment may not have), fall back to **manual worktrees**: the
     Coordinator runs `git worktree add -b wave-N/phase-K <dir> <base>` per
@@ -23,10 +29,12 @@ parallel Builders. Everything else is plain git + shell + files.
     still fresh contexts, so isolation holds. Remove the worktrees
     (`git worktree remove --force`) and delete the merged branches after
     each wave.
-  - **Resuming a dead Builder**: `SendMessage` to the same subagent — its
-    context and its partial work on the branch are intact. A fresh `Agent`
-    call starts cold and re-explores; only do that if the transcript is
-    gone.
+  - **Resuming a dead Builder, or feeding back fix findings**: `SendMessage`
+    to the same subagent — its context and its partial work on the branch
+    are intact. A fresh `Agent` call starts cold and re-explores the phase,
+    the digest, and every touched file; only do that if the transcript is
+    gone. Same for a rate-limited Reviewer/Verifier that checkpointed its
+    partial `review.md` / `verify.md` — resume it, don't restart.
 - **Reviewer / Verifier**: a new `Agent` call — a fresh subagent starts cold,
   which satisfies isolation. Never reuse a builder subagent for review.
   Verifier and light-gate Reviewer take `model: {models.cheap}`. Point them
@@ -35,6 +43,10 @@ parallel Builders. Everything else is plain git + shell + files.
   background `Bash` calls, then read both results.
 - **Heavy review**: the human runs `config.heavy_review` (e.g.
   `/code-review ultra`); the Coordinator only names it in the wave report.
+- **Wave-to-wave (autobuild)**: after writing a wave report the Coordinator
+  issues the next wave's `Agent` calls in the same turn. It does not end its
+  turn to let the user say "continue" — there is no confirmation step
+  between waves. The turn ends only at completion or an unrecoverable block.
 
 ## Codex — CLI (`codex` / `codex exec`)
 

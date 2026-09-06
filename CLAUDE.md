@@ -52,7 +52,7 @@ state under `.beehive/` and a pointer in its `CLAUDE.md`.
 
 - Change `PROTOCOL.md` first, then propagate to `ROLES.md` / `SKILL.md` /
   `README.md` / `templates/`. Grep for the term you changed.
-- Keep the version line at the top of `PROTOCOL.md` current (`v0.3` now).
+- Keep the version line at the top of `PROTOCOL.md` current (`v0.5` now).
   Bump minor for a new rule or field; note what changed in the `<!-- -->`
   comment under the version line.
 - Step numbers in `PROTOCOL.md` §ACT 3 are referenced from `ROLES.md` and
@@ -65,4 +65,4 @@ state under `.beehive/` and a pointer in its `CLAUDE.md`.
 
 `README.md` has it. Short version: `ln -s "$(pwd)" ~/.claude/skills/beehive`
 then `/beehive` in any project. Public repo:
-`github.com/hanifmohammed00/beehive` (MIT). `v0.3` current.
+`github.com/hanifmohammed00/beehive` (MIT). `v0.5` current.

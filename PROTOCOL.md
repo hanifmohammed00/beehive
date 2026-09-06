@@ -1,6 +1,20 @@
-# Beehive Protocol v0.3
+# Beehive Protocol v0.5
 
-<!-- v0.3: first real run (wells-frogo diversify-search, examples/). Branch
+<!-- v0.5: token-cost hardening from a large real run (~5M subagent tokens).
+     risk: empirical phases get a cheap spike before the full build, so a
+     wrong approach is caught at spec time not verify time. Model tiering is
+     mandatory, not advisory — the Interviewer sets models.cheap. Reviewer
+     reads tests.log instead of re-running the suite; Verifier narrows to
+     end-to-end. Fix findings go back to the same Builder warm, and the
+     recheck gate is derived from the fix diff, not the phase. Reviewer /
+     Verifier checkpoint their output as they go so a rate-limited one
+     resumes. Coordinator may drop context between waves. Concurrency is
+     staggered on metered plans.
+     v0.4: autobuild is fully unattended — the Coordinator never asks the
+     user to confirm, approve, or "activate" a wave; wave activation is
+     automatic and the only halt is an unrecoverable block. "Waiting" in
+     autobuild always means waiting on another agent, never on the user.
+     v0.3: first real run (wells-frogo diversify-search, examples/). Branch
      names deconflicted (wave-N-int); Phase 0 gate depth by whether it lands
      behaviour; resume-a-dead-builder rule; deferrals must be tracked;
      archive a prior run; Verifier seeds its own data. -->
@@ -40,12 +54,15 @@ plan first, or just build?"** — which sets the autonomy mode for Acts 2–3:
 
 | mode | Act 2/3 gates |
 |---|---|
-| `autobuild` (default) | Coordinator runs every wave start to finish without stopping between phases or waves. It writes a report after each wave and updates progress (§Progress), but does **not** wait for approval. It stops **only** on an unrecoverable block: tests still red after builder retries, a verify fail, or a merge conflict that exposes a spec bug. |
+| `autobuild` (default) | Coordinator runs every wave start to finish without stopping between phases or waves. Wave activation is automatic — it does **not** ask the user to confirm, approve, or "start" a wave at any point. It writes a report after each wave and updates progress (§Progress), but never waits for a reply. It stops **only** on an unrecoverable block: tests still red after builder retries, a verify fail, or a merge conflict that exposes a spec bug. |
 | `review` | Coordinator additionally stops for human approval after `phase-spec.md`, after `wave-plan.md`, and after every wave report, before continuing. Opt-in — for when the human wants to inspect each step. |
 
-Record the choice in `config.yml` as `mode:`. A phase finishing never
-returns to the human for permission in `autobuild` — the wave report and the
-progress line are the notification, and the build carries on.
+Record the choice in `config.yml` as `mode:`. In `autobuild` a finishing
+phase or wave never returns to the human for permission — the wave report and
+the progress line are a notification the user can read later, not a prompt,
+and the next wave has already begun. "Waiting" in `autobuild` only ever means
+waiting on another agent (a Builder finishing, the Verifier passing), never
+on the user.
 
 ---
 
@@ -64,6 +81,11 @@ A numbered phase list. Each phase declares, verbatim in these fields:
   §Progress estimate and the default gate depth (§ACT 3)
 - `gate` — optional override: `light` | `standard` | `full`. Omitted →
   derived from weight (1–2 light, 3–4 standard, 5+ full).
+- `risk` — optional: `empirical` when the phase's approach rests on
+  unverified behaviour of something the code review cannot predict — an
+  optimizer's monotonicity, an external API's shape, a query planner, a real
+  data distribution. Triggers a **spike** before the full build (§ACT 3
+  step 1). The Interviewer tags these; when in doubt, tag it.
 
 Anything the Interviewer could not get confirmed is tagged `ASSUMED —
 correct me` inline, so the human fixes it in review, not in more Q&A.
@@ -113,9 +135,11 @@ test:                                 # full suite — every command exit 0 to p
 test_quick: "pytest backend/ -k {phase_area}"  # optional; the fast subset a Builder runs while iterating
 boot: "npm --prefix frontend run dev" # verifier only; optional
 heavy_review: "/code-review ultra"    # human-run; the protocol never invokes it
-models:                               # optional; per-role model when the platform supports it
+models:                               # per-role model when the platform supports it
   strong: default                     # Coordinator, Builder, full-gate Reviewer
-  cheap: default                      # Verifier, light-gate Reviewer
+  cheap: <cheapest capable model>     # Verifier, light-gate Reviewer — the Interviewer
+                                      # sets this; leaving it `default` wastes real cost
+                                      # (Verifier work is curl + paste-evidence)
 ```
 
 ---
@@ -156,7 +180,8 @@ is in `ADAPTERS.md`. Prompts for each role are in `ROLES.md`.
 5. Asks the final question: **"Do you want to read the plan before I build,
    or should I just go ahead?"** → sets `mode`.
 6. `mode: review` → human approves `phase-spec.md`. `mode: autobuild` →
-   proceed.
+   proceed straight into Act 2 in the same turn; do not stop to announce the
+   spec or ask for a go-ahead.
 
 ### ACT 2 — Plan (Coordinator; deterministic)
 
@@ -179,8 +204,9 @@ out as a long chain, that is a signal Phase 0 missed a shared contract or a
 `hot_file` needs splitting (§Speed) — say so in `wave-plan.md`.
 
 Write `wave-plan.md`: the partition, and one line of reasoning per wave.
-`mode: autobuild` → continue straight into Act 3. `mode: review` → stop for
-human sign-off first.
+`mode: autobuild` → continue straight into Act 3 and spawn wave 1's Builders
+in the same turn — the plan file is a record, not a checkpoint. `mode:
+review` → stop for human sign-off first.
 
 ### ACT 3 — Build, for each wave N in order
 
@@ -197,12 +223,24 @@ verify | blocked | merged` — so a resuming agent knows where the wave stopped.
    Builder. Builder writes `.beehive/wave-N/build/phase-K.md` (≤15 lines:
    what changed, deviations, new files). While iterating, a Builder runs
    `config.test_quick` (fast subset); the full suite is the gate's job.
+   **Spike first if `risk: empirical`.** Before writing the real
+   implementation, the Builder (or the Coordinator in the main thread, if
+   it's a few lines) writes the smallest throwaway script that exercises the
+   unverified assumption against a real fixture, pastes the result into
+   `.beehive/wave-N/spike-K.md` (≤10 lines), and only then proceeds. If the
+   assumption is false, it stops and kicks the phase back to the human with
+   the evidence — a re-spec now is a fraction of a full build→review→verify
+   cycle discovering it at the end.
    **3-strike rule:** a Builder that can't get its own tests green after 3
    attempts stops and reports — the Coordinator reassigns or escalates,
    rather than letting it burn tokens flailing. **A Builder that dies
    mid-phase** (crash, rate limit, timeout) is *resumed* with its context
    intact, never cold-restarted — its partial work is on its branch, and a
-   cold agent would re-explore and re-derive it.
+   cold agent would re-explore and re-derive it. **Review/verify findings go
+   back to the same Builder, context intact** (same-session continuation
+   where the platform supports it — `ADAPTERS.md`), not to a fresh instance
+   that re-reads the phase, the digest, and every touched file. Cold-start a
+   fix Builder only if the original is unrecoverable.
 2. **Integrate** — Coordinator merges phase branches → branch `wave-N-int`
    (not `wave-N` — that collides with the `wave-N/phase-K` refs).
    Resolves conflicts. A conflict that shows two phases disagreed on an
@@ -221,13 +259,21 @@ verify | blocked | merged` — so a resuming agent knows where the wave stopped.
      (`ROLES.md` §Reviewer) → `.beehive/wave-N/review.md`. No separate
      Verifier; the test gate stands in.
    - `full` — Reviewer **and** a fresh Verifier (`ROLES.md` §Verifier):
-     clean checkout, `config.test`, `config.boot`, exercise the real
-     user-facing paths → `.beehive/wave-N/verify.md`. A clean checkout has
-     no runtime state — the Verifier seeds what it needs from fixtures or a
-     documented import, never the user's live data.
-   Any finding above trivial → Builder → back to step 3. A **scoped**
-   frontend-or-copy-only fix can be re-checked by the Reviewer alone rather
-   than a second full Verifier pass, if the substance already verified.
+     clean checkout, `config.boot`, exercise the real user-facing paths this
+     wave added, hand-check the numbers → `.beehive/wave-N/verify.md`. A
+     clean checkout has no runtime state — the Verifier seeds what it needs
+     from fixtures or a documented import, never the user's live data.
+   The Reviewer does **not** re-run `config.test` — it reads
+   `.beehive/wave-N/tests.log` from step 3 (same tree, minutes old) and
+   judges the diff. The Verifier re-runs `config.test` only if it has a
+   concrete reason to distrust the log; its own job is the end-to-end
+   exercise, which nothing else does. One full-suite tokenization per wave,
+   not three.
+   Any finding above trivial → Builder (same one, warm — step 1) → back to
+   step 3. **The recheck gate is derived from the fix diff, not the phase.**
+   A frontend / copy / single-constraint fix that doesn't touch verified
+   substance → Coordinator eyeballs it (light). Only a fix that changes core
+   logic re-triggers the phase's full gate.
 5. **Gate** — Coordinator writes `.beehive/wave-N/report.md`, starting with
    a parseable front-matter block, then the prose body:
    ```
@@ -244,13 +290,22 @@ verify | blocked | merged` — so a resuming agent knows where the wave stopped.
    human's optional deep check. Patches `digest.md` with what changed
    (§digest). Updates `.beehive/progress.md` (§Progress).
    `mode: autobuild` → merge `wave-N-int` to the working branch (it passed
-   the test gate), then start wave N+1's **Build** immediately while this
-   wave's Review+Verify run *in parallel* — they don't edit code, so a
-   finding just feeds back as a fix on the already-merged phase. Guard: if
-   wave N has a `full` gate, N+1 may **build** in parallel but must not
-   **merge** until N's Verify passes — so nothing compounds on an unverified
+   the test gate), then start wave N+1's **Build** immediately, in the same
+   turn as writing the report, while this wave's Review+Verify run *in
+   parallel* — they don't edit code, so a finding just feeds back as a fix
+   on the already-merged phase. Do **not** post the report and wait for the
+   user to tell you to continue — activating wave N+1 is automatic. Guard:
+   if wave N has a `full` gate, N+1 may **build** in parallel but must not
+   **merge** until N's Verify passes — the Coordinator waits on the Verifier
+   agent for this, not on the user — so nothing compounds on an unverified
    foundation. Stop only on an unrecoverable block. `mode: review` → wait
    for approval.
+   On a long run (4+ waves) the Coordinator's own context grows every wave —
+   every dispatch prompt, every notification, every report it wrote. It may
+   **drop that context between waves and resume from `.beehive/`**
+   (§Resuming): `progress.md`, the newest report front-matter,
+   `wave-N/status`. It holds no state the files don't. This caps the
+   Coordinator's cost at roughly one wave's worth instead of the whole run's.
 
 ---
 
@@ -288,7 +343,9 @@ if 80% of the work is a serial chain, infinite builders still only cut ~20%.
 So beehive spends its effort making the graph *wider*, then runs the width
 in parallel.
 
-Levers, in the order they pay off:
+Levers, in the order they pay off — the first eight cut wall-clock, the last
+two (and §Economy) cut token cost, which on a metered plan is the real
+ceiling:
 
 1. **Phase 0 contracts** (§Phase 0) — the single biggest one. Move every
    shared type/schema/signature into one small early phase so the rest
@@ -303,7 +360,8 @@ Levers, in the order they pay off:
    parallelism for every later phase. Flag it; let the human decide.
 4. **Risk-proportional gates** (§ACT 3 step 4) — a `weight: 1` docs phase
    does not need a fresh Reviewer and a Verifier boot. Save the full triad
-   for the `weight: 5+` phases.
+   for the `weight: 5+` phases. And a fix-recheck is gated by the *fix*, not
+   the phase — a copy tweak doesn't earn a second full Verifier pass.
 5. **Pipelined gates** (§ACT 3 step 5) — Review/Verify of wave N overlap
    the build of wave N+1.
 6. **Tight inner loop** — `config.test_quick` while a Builder iterates,
@@ -314,16 +372,23 @@ Levers, in the order they pay off:
    back-to-back.
 9. **Model tiering** (`config.models`) — strong model for Coordinator,
    Builders, and full-gate Reviewers; a cheaper/faster one for the Verifier
-   and light-gate Reviewers, which mostly run commands and report. On a
-   metered plan, tiering and wave width are also a *budget* lever: N
-   concurrent Builders burn ~N× the token rate, and hitting a rate limit
-   mid-wave costs more time than it saved. Widen the graph at spec time;
-   don't necessarily run the whole width at once.
+   and light-gate Reviewers, which mostly run commands and report evidence.
+   Route by the Roles table — this is not advisory. The Interviewer sets
+   `models.cheap`; a run that leaves it `default` pays the strong-model rate
+   for every curl-and-paste Verifier. Doesn't cut token *count*, cuts cost.
+10. **Stagger concurrency on a metered plan.** N concurrent Builders burn
+    ~N× the token rate; a rate-limit mid-wave costs more than the
+    parallelism saved, and a rate-limited Reviewer/Verifier is *pure* loss
+    (no artifact until it finishes). Widen the graph at spec time, but run
+    ~2–3 agents at once, not the whole wave width. Reviewer and Verifier
+    checkpoint their output as they go (§Economy) so a killed one resumes.
 
 What does **not** help: adding builders to an existing chain (they idle),
 or "build everything then review once at the end" (late-caught foundation
 bugs force rework of everything above them — the per-wave gate is the cheap
-place to catch them).
+place to catch them). The de-risk equivalent: committing a full
+Builder→Reviewer→Verifier cycle to a phase whose approach was never checked
+against real data — spike it first (§ACT 3 step 1, `risk: empirical`).
 
 ---
 
@@ -349,6 +414,15 @@ report, not volume.
 - **Reviewer sees the diff, not the files.** `git diff
   <working-branch>...wave-N-int`, plus `digest.md` and the spec — never the
   full source of every touched file.
+- **Don't re-tokenize an unchanged test run.** The gate ran `config.test`
+  and saved `tests.log`. The Reviewer reads that file; it does not re-run
+  the suite on the same tree. Only the Verifier runs it again, and only if
+  it distrusts the log. Same for the Coordinator across a fix loop — one
+  full run per gate, re-run only what the fix touched.
+- **Checkpoint long outputs.** Reviewer appends each finding to `review.md`
+  as it lands; Verifier appends evidence as each check completes — not one
+  write at the end. A rate-limited or crashed instance resumes from its own
+  partial file instead of starting over.
 - **Notes are bounded.** Builder note ≤15 lines. Reviewer findings are
   one-liners: `severity · file:line · problem · fix` — never restate the
   spec back. Verifier gives evidence, not narrative. Wave report is the
@@ -387,9 +461,17 @@ report, not volume.
 - A Builder stops and reports after 3 failed attempts to green its tests —
   no indefinite flailing.
 - Every role reads `digest.md`; nobody re-explores what it already covers.
+- A `risk: empirical` phase spikes the unverified assumption before its full
+  build; a false assumption goes back to the human, not into a full gate.
+- Review/verify findings return to the Builder that wrote the phase, context
+  intact — cold-start a fix Builder only if the original is unrecoverable.
 - Test results are pasted as raw output, never summarized as "passed".
 - All cross-role handoff goes through `.beehive/` files.
 - The final wave is docs/polish, alone.
+- In `autobuild` the Coordinator never asks the user to confirm, approve, or
+  "activate" a wave — not after the spec, not after the plan, not after a
+  wave report, not between phases. Wave activation is automatic; the run
+  halts only on an unrecoverable block.
 
 ---
 
@@ -409,3 +491,7 @@ wave's `status` file (`building | integrating | testing | review | verify |
 blocked | merged`). Open a report's prose body only when you need the
 detail. `progress.md` is the one-line history. The agent holds no state —
 everything is on disk.
+
+Because of this, a Coordinator on a long run can deliberately resume this
+way between waves (§ACT 3 step 5) to keep its own context from growing with
+every wave — not only after a crash.

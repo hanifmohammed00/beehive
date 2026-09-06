@@ -35,6 +35,8 @@ atomic commit per apply, etc. State them once here, not in every phase.>
 - **tests**: <the concrete checks that must pass for this phase>
 - **weight**: 3         # 1 trivial … 8 major build
 - **gate**: standard    # optional; omit to derive from weight (1–2 light, 3–4 standard, 5+ full)
+- **risk**: empirical   # optional; approach rests on unverified real-world behaviour
+                        # (optimizer, external API, query planner, data shape) → spike first
 
 ## Phase 2 — <name>
 
