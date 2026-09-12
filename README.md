@@ -68,7 +68,13 @@ Vendor `PROTOCOL.md`, `ROLES.md`, `ADAPTERS.md` into the repo (e.g. under
    next wave's build overlaps the current wave's review. A phase whose
    approach rests on unverified real-world behaviour is spiked against real
    data before the full build, so a wrong design is caught at spec time, not
-   after a full review-and-verify cycle. Reports after each wave; writes a
-   completion percent to `.beehive/progress.md`. In the default `autobuild`
-   mode it never stops to ask you to approve or start a wave — it just keeps
-   going, halting only on an unrecoverable block.
+   after a full review-and-verify cycle. Reports after each wave — including
+   token usage per role, which economy levers actually fired, and any
+   crash→resume cycles a role went through, not just what the spec says
+   should happen — and writes a completion percent to `.beehive/progress.md`.
+   A role that crashes gets actively resumed, not silently left; one that
+   never comes back blocks the wave instead of vanishing from the count. In
+   the default `autobuild` mode it never stops to ask you to approve or
+   start a wave — it just keeps going, halting only on an unrecoverable
+   block. On the final wave it writes `.beehive/summary.md`: the whole run's
+   token usage, lever checklist, and any crash history in one file.

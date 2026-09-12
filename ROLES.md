@@ -51,7 +51,7 @@ obeys `PROTOCOL.md` §Economy.
 > helper/type signatures, test commands; ≤150 lines) that every later role
 > reads instead of re-exploring the repo. In `config.yml` set `models.cheap`
 > to the cheapest capable model this platform offers (the Verifier and
-> light-gate Reviewers run on it) — do not leave it `default`.
+> standard-gate Reviewers run on it) — do not leave it `default`.
 >
 > Then ask exactly one more question: **"Do you want to read the plan
 > before I build, or should I just go ahead and build it?"** Set
@@ -65,8 +65,12 @@ obeys `PROTOCOL.md` §Economy.
 > partition, merge, run test commands, spawn the other roles, patch
 > `digest.md`, write wave reports, and (in `mode: review`) gate on the
 > human. Spawn Builders and full-gate Reviewers on `{models.strong}`; the
-> Verifier and light-gate Reviewers on `{models.cheap}` when the platform
-> supports per-agent models.
+> Verifier and standard-gate Reviewers on `{models.cheap}` when the platform
+> supports per-agent models — resolve this from `config.models` and the
+> wave's gate depth **before every spawn**, explicitly, rather than letting
+> the call default to an inherited model. A `light` gate spawns no separate
+> Reviewer at all, so there's no third tier to route — don't go looking for
+> one.
 >
 > Act 2: run the partition algorithm in `PROTOCOL.md` §ACT 2 against
 > `{spec}` and `{hot_files}`. Write `.beehive/wave-plan.md`.
@@ -80,13 +84,30 @@ obeys `PROTOCOL.md` §Economy.
 > and surface it to the human. Keep `.beehive/wave-N/status` current. A
 > Builder that dies mid-phase — or that gets review/verify findings — is
 > *resumed* with its context, not cold-restarted; cold-start a fix Builder
-> only if the original is gone. The Reviewer reads `tests.log`, not a fresh
-> suite run; re-run in a fix loop only what the fix touched, and gate the
-> recheck by the fix diff not the phase. Wave report starts with the
-> front-matter block in §ACT 3 step 5, then the prose body — nothing added.
-> After each wave: patch `digest.md` with what changed, update
-> `.beehive/progress.md` per §Progress. On a 4+ wave run you may drop your
-> own context between waves and resume from `.beehive/` (§Resuming).
+> only if the original is gone. Same for a Reviewer or Verifier that dies
+> mid-check. Don't just wait for it to come back: dispatching and waiting is
+> not a liveness check, and a crashed agent nobody re-pings stays crashed.
+> If a role has produced no new output in longer than it should plausibly
+> take, actively check on it and resume it (`ADAPTERS.md` for the
+> mechanics) before doing anything else. The Reviewer reads `tests.log`,
+> not a fresh suite run; re-run in a fix loop only what the fix touched,
+> and gate the recheck by the fix diff not the phase. Wave report starts
+> with the front-matter block in §ACT 3 step 5, then the prose body —
+> nothing added. Fill `tokens` (per role, best-effort — `n/a` if the
+> platform doesn't expose it), `mechanisms` (what you actually did this
+> wave: which phases spiked, whether cheap/strong models were actually
+> used, whether the Reviewer reused `tests.log`, whether Reviewer/Verifier
+> checkpointed, how many Builders ran at once), `resume` (per role that
+> crashed, how many crash→resume cycles — omit roles that didn't), and
+> `stuck` (roles that crashed and never came back) per §Report — don't
+> guess a field, leave it out. A non-empty `stuck` means this wave is
+> `blocked`, not `passed`, until it's resolved. After each wave: patch
+> `digest.md` with what changed, update `.beehive/progress.md` per
+> §Progress. On a 4+ wave run you may drop your own context between waves
+> and resume from `.beehive/` (§Resuming). On the final wave, after the
+> last progress line, write `.beehive/summary.md`: `tokens` summed per role
+> across every wave, `mechanisms` merged into one run-wide checklist, and
+> every `resume`/`stuck` entry carried forward (§Report).
 >
 > In `mode: autobuild`: never stop between phases or waves for permission,
 > and never ask the user to confirm or "activate" the next wave — the report

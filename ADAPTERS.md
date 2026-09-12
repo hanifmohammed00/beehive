@@ -35,10 +35,31 @@ parallel Builders. Everything else is plain git + shell + files.
     the digest, and every touched file; only do that if the transcript is
     gone. Same for a rate-limited Reviewer/Verifier that checkpointed its
     partial `review.md` / `verify.md` — resume it, don't restart.
+  - **Detecting a dead role, not just resuming one.** A background `Agent`
+    call's completion notification is not guaranteed if the subagent's
+    session dies outright — silence is not evidence it's still working.
+    Don't wait indefinitely: if a wave's `status` hasn't advanced and no new
+    `build/phase-K.md` / `review.md` / `verify.md` line has appeared in
+    longer than the phase would plausibly take, use `ListAgents` to check
+    whether the subagent is still addressable. If it is, `SendMessage` to
+    resume it; if it's gone, cold-start a fix instance per the rule above.
+    Log each crash and its outcome into the wave report's `resume` field
+    (§Report) as it happens — a role that never comes back is `stuck` and
+    blocks the gate. From one real run: of 7 role instances that crashed,
+    the 5 running on an inherited model all resumed cleanly, while all 4
+    running on an explicit `model:` override went permanently unresponsive.
+    That run's explicit-model dispatches only existed because the human was
+    manually correcting a model-tiering miss (below) — so the more likely
+    story is reduced human attention on resumes during manual intervention,
+    not the `model:` parameter itself. Still, until model tiering is
+    actually resolved automatically and reliably, treat a manually-dispatched
+    role as needing a liveness check sooner, not later.
 - **Reviewer / Verifier**: a new `Agent` call — a fresh subagent starts cold,
   which satisfies isolation. Never reuse a builder subagent for review.
-  Verifier and light-gate Reviewer take `model: {models.cheap}`. Point them
-  at `wave-N-int` (the integration branch) / its diff.
+  Verifier and standard-gate Reviewer take `model: {models.cheap}` — pass
+  it explicitly on the `Agent` call's `model` parameter; a `light` gate has
+  no separate Reviewer agent, so there's no third case to handle. Point
+  them at `wave-N-int` (the integration branch) / its diff.
 - **Concurrent tests**: run the `config.test` commands as parallel
   background `Bash` calls, then read both results.
 - **Heavy review**: the human runs `config.heavy_review` (e.g.
@@ -47,6 +68,17 @@ parallel Builders. Everything else is plain git + shell + files.
   issues the next wave's `Agent` calls in the same turn. It does not end its
   turn to let the user say "continue" — there is no confirmation step
   between waves. The turn ends only at completion or an unrecoverable block.
+- **Token/mechanism reporting (§Report)**: `mechanisms` needs no platform
+  support — the Coordinator fills it from what it actually did (which model
+  it dispatched each agent on, whether a spike ran, whether it told the
+  Reviewer to skip re-running tests, how many Builders it ran at once), not
+  from inspecting anything. `tokens` has **no tool-level source today** —
+  neither the `Agent` tool's result nor `TaskOutput` returns a token count,
+  only output text and status. Mark `tokens: n/a` per role rather than
+  estimate. The one number a human can add by hand afterward is the
+  session's own total cost/context display (e.g. `/cost`, or the terminal
+  UI) — that's whole-session, not broken out per role, so it belongs in
+  the human's own notes, not something the Coordinator can fill in.
 
 ## Codex — CLI (`codex` / `codex exec`)
 

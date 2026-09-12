@@ -20,7 +20,7 @@ mechanics for spawning Builders / Reviewers / Verifiers are in
 
 Per-project state lives in the target repo's `.beehive/` directory:
 `config.yml`, `brief.md`, `phase-spec.md`, `wave-plan.md`, `progress.md`,
-`wave-N/`. If that directory has no `config.yml`, start at intake and
+`summary.md`, `wave-N/`. If that directory has no `config.yml`, start at intake and
 create it — starting points for `config.yml`, `brief.md`, and
 `phase-spec.md` are in this skill's `templates/`.
 
@@ -42,7 +42,11 @@ create it — starting points for `config.yml`, `brief.md`, and
   permission and without ever asking the user to confirm or "activate" the
   next wave — it just starts it — updating `.beehive/progress.md` after each
   wave, stopping only on an unrecoverable block. `mode: review` also stops
-  for approval at each gate.
+  for approval at each gate. A role that crashes gets actively resumed and
+  tracked, never silently left; one that never comes back blocks the wave.
+  Writes `.beehive/summary.md` on the final wave — token usage per role,
+  which economy levers actually fired, and any crash history, across the
+  whole run.
 
 ## Non-negotiable
 
@@ -50,8 +54,9 @@ create it — starting points for `config.yml`, `brief.md`, and
   are always fresh subagents, never a Builder; Builders get only their
   phase's scope; test output is pasted raw; two phases sharing a `hot_file`
   never share a wave; a `risk: empirical` phase spikes before it builds;
-  fix findings go back to the same Builder warm; the Verifier and light-gate
-  Reviewers run on `models.cheap`.
+  fix findings go back to the same Builder warm; the Verifier and
+  standard-gate Reviewers run on `models.cheap` — resolve and pass this
+  explicitly on every spawn, never rely on it defaulting.
 - The Coordinator does not write feature code — only merges, test runs,
   reports, progress, and doc edits.
 - Never invoke `config.yml` `heavy_review` — name it in the wave report for
