@@ -1,6 +1,26 @@
-# Beehive Protocol v0.5
+# Beehive Protocol v0.6
 
-<!-- v0.5: token-cost hardening from a large real run (~5M subagent tokens).
+<!-- v0.6: §Report — each wave report gets a best-effort `tokens` field (per
+     role) and a `mechanisms` checklist recording which v0.5 levers actually
+     fired this wave (spike ran, cheap model used, tests.log reused,
+     checkpointed, concurrency staggered) instead of just what the spec
+     says should happen. The Coordinator writes `.beehive/summary.md` on the
+     final wave, aggregating both across the whole run — one file to check
+     whether a run did what the protocol claims and where its tokens went.
+     Crash/resume is now tracked, not assumed: a `resume` field records each
+     role's crash→resume cycles, and a role that crashed and never came back
+     is `stuck` and blocks `status: passed` — from a run where 4 of 11 role
+     instances went permanently unresponsive after a crash and nobody
+     noticed until reading a hand-built table after the fact (§ACT 3 step 1,
+     §Report, `ADAPTERS.md`). Fixed a real bug found in that same run: the
+     model-tiering rule told the Coordinator to route a "light-gate
+     Reviewer" to `models.cheap`, but a `light` gate spawns no separate
+     Reviewer agent at all (§ACT 3 step 4) — so that instance never existed
+     to match against, and the one real cheap-eligible Reviewer (the
+     `standard`-gate one) silently never got tiered. Renamed it
+     `standard-gate Reviewer` everywhere and required the model be resolved
+     and passed explicitly on every spawn, not left to default.
+     v0.5: token-cost hardening from a large real run (~5M subagent tokens).
      risk: empirical phases get a cheap spike before the full build, so a
      wrong approach is caught at spec time not verify time. Model tiering is
      mandatory, not advisory — the Interviewer sets models.cheap. Reviewer
@@ -137,9 +157,11 @@ boot: "npm --prefix frontend run dev" # verifier only; optional
 heavy_review: "/code-review ultra"    # human-run; the protocol never invokes it
 models:                               # per-role model when the platform supports it
   strong: default                     # Coordinator, Builder, full-gate Reviewer
-  cheap: <cheapest capable model>     # Verifier, light-gate Reviewer — the Interviewer
+  cheap: <cheapest capable model>     # Verifier, standard-gate Reviewer — the Interviewer
                                       # sets this; leaving it `default` wastes real cost
-                                      # (Verifier work is curl + paste-evidence)
+                                      # (a `light` gate has no separate Reviewer agent at
+                                      # all — the Coordinator eyeballs it itself, so there
+                                      # is no such thing as a "light-gate Reviewer" to route)
 ```
 
 ---
@@ -241,6 +263,17 @@ verify | blocked | merged` — so a resuming agent knows where the wave stopped.
    where the platform supports it — `ADAPTERS.md`), not to a fresh instance
    that re-reads the phase, the digest, and every touched file. Cold-start a
    fix Builder only if the original is unrecoverable.
+   **A resume the Coordinator doesn't actively drive doesn't happen.**
+   Dispatching a role and waiting is not a liveness check — a crashed agent
+   that nobody re-pings stays crashed, silently, for the rest of the run.
+   The Coordinator checks in on outstanding roles rather than trusting a
+   notification that may never arrive (`ADAPTERS.md` for the mechanics); a
+   role with no new output past a reasonable interval gets an explicit
+   resume attempt before anything else proceeds. Record every crash→resume
+   cycle in the wave report's `resume` field (§Report) as it happens, not
+   from memory at gate time. A role that still hasn't come back when the
+   gate is written is **stuck**, not silently dropped — the wave cannot
+   report `status: passed` while any role is stuck.
 2. **Integrate** — Coordinator merges phase branches → branch `wave-N-int`
    (not `wave-N` — that collides with the `wave-N/phase-K` refs).
    Resolves conflicts. A conflict that shows two phases disagreed on an
@@ -274,6 +307,9 @@ verify | blocked | merged` — so a resuming agent knows where the wave stopped.
    A frontend / copy / single-constraint fix that doesn't touch verified
    substance → Coordinator eyeballs it (light). Only a fix that changes core
    logic re-triggers the phase's full gate.
+   The liveness rule in step 1 applies here too — a fresh Reviewer or
+   Verifier can die mid-check as easily as a Builder can, and gets the same
+   active resume-and-track treatment, not a silent wait.
 5. **Gate** — Coordinator writes `.beehive/wave-N/report.md`, starting with
    a parseable front-matter block, then the prose body:
    ```
@@ -283,12 +319,17 @@ verify | blocked | merged` — so a resuming agent knows where the wave stopped.
    percent: 62
    status: passed        # passed | blocked
    blockers: []
+   tokens: {builder: 41000, reviewer: 6000, verifier: 4000}  # n/a if the platform doesn't expose it
+   mechanisms: {spiked: [], model_tiering: true, tests_reused: true, checkpointed: true, staggered: 3}
+   resume: {}            # role: crash count, omit roles that never crashed; empty if none did
+   stuck: []             # roles that crashed and never came back — must be empty for status: passed
    ---
    ```
    Body: diff stat, last ~20 lines of `tests.log`, review findings +
    resolutions, verify verdict (if run). Names `config.heavy_review` as the
    human's optional deep check. Patches `digest.md` with what changed
-   (§digest). Updates `.beehive/progress.md` (§Progress).
+   (§digest). Updates `.beehive/progress.md` (§Progress). `tokens`,
+   `mechanisms`, `resume`, and `stuck` are explained in §Report, below.
    `mode: autobuild` → merge `wave-N-int` to the working branch (it passed
    the test gate), then start wave N+1's **Build** immediately, in the same
    turn as writing the report, while this wave's Review+Verify run *in
@@ -336,6 +377,50 @@ On the final wave, the last line reads `100% · complete`.
 
 ---
 
+## Report
+
+`percent` says how much is done. It says nothing about whether the run
+actually behaved the way the protocol claims — that a `risk: empirical`
+phase was really spiked, that the Verifier really ran on the cheap model,
+that the Reviewer didn't quietly re-tokenize the whole suite. Two more
+fields on the wave report (§ACT 3 step 5) close that gap, best-effort —
+leave a field out or `n/a` rather than guess:
+
+- **`tokens`** — per role, this wave's token usage, if the platform
+  surfaces it (§ADAPTERS.md has the mechanics per platform). This is where
+  the cost actually went, not an estimate from phase `weight`.
+- **`mechanisms`** — what the Coordinator actually did this wave, not what
+  the spec says it should do: which phases' `risk: empirical` spike ran
+  (`spiked`), whether the Verifier and standard-gate Reviewers ran on
+  `models.cheap` (`model_tiering`), whether the Reviewer read `tests.log`
+  instead of re-running the suite (`tests_reused`), whether Reviewer/Verifier
+  checkpointed their output instead of writing once at the end
+  (`checkpointed`), and how many Builders ran at once (`staggered`). The
+  Coordinator fills this from its own actions — it needs no extra
+  inspection. A lever reading `false`/`0` across several waves is a signal
+  the config or the Coordinator is skipping it, not that it doesn't apply.
+- **`resume`** — per role that crashed this wave, how many crash→resume
+  cycles it went through (§ACT 3 step 1). Roles that never crashed are
+  omitted, not listed at `0`. This is the field that turns "a Builder that
+  dies mid-phase is resumed" from an assumption into something the human
+  can audit without reconstructing it from session logs after the fact.
+- **`stuck`** — roles that crashed and, despite an active resume attempt
+  (not just waiting), never came back. Non-empty `stuck` means the wave
+  cannot report `status: passed` — a stuck Builder means unmerged work, a
+  stuck Reviewer/Verifier means an ungated one, and moving on with either
+  quietly is exactly the failure mode this field exists to stop. `blocked`
+  with the stuck role named, same as any other unresolved gate.
+
+On the final wave, after the last `progress.md` line, the Coordinator
+writes `.beehive/summary.md`: `tokens` summed per role across every wave,
+every wave's `mechanisms` merged into one run-wide checklist, and every
+`resume`/`stuck` entry carried forward — so a run that needed several
+crash recoveries to finish shows that plainly, instead of just `100% ·
+complete`. One file the human reads once, instead of opening every wave
+report.
+
+---
+
 ## Speed
 
 Wall-clock is bounded by the dependency graph, not the agent count (Amdahl):
@@ -371,9 +456,13 @@ ceiling:
 8. **Concurrent test commands** — backend ∥ frontend at the gate, not
    back-to-back.
 9. **Model tiering** (`config.models`) — strong model for Coordinator,
-   Builders, and full-gate Reviewers; a cheaper/faster one for the Verifier
-   and light-gate Reviewers, which mostly run commands and report evidence.
-   Route by the Roles table — this is not advisory. The Interviewer sets
+   Builders, and full-gate Reviewers (the ones backed by nothing else, or
+   judging the highest-weight phases); a cheaper/faster one for the
+   Verifier (curl-and-paste evidence work) and the standard-gate Reviewer
+   (weight 3–4, lower stakes than full). A `light` gate has no separate
+   Reviewer agent at all — there is no third, cheaper tier to route; don't
+   go looking for a "light-gate Reviewer" instance, it doesn't exist. Route
+   by the Roles table — this is not advisory. The Interviewer sets
    `models.cheap`; a run that leaves it `default` pays the strong-model rate
    for every curl-and-paste Verifier. Doesn't cut token *count*, cuts cost.
 10. **Stagger concurrency on a metered plan.** N concurrent Builders burn
@@ -465,6 +554,9 @@ report, not volume.
   build; a false assumption goes back to the human, not into a full gate.
 - Review/verify findings return to the Builder that wrote the phase, context
   intact — cold-start a fix Builder only if the original is unrecoverable.
+- A crashed role is actively resumed and tracked (`resume` / `stuck` in the
+  wave report), never silently left — a wave cannot report `status: passed`
+  while any role is `stuck`.
 - Test results are pasted as raw output, never summarized as "passed".
 - All cross-role handoff goes through `.beehive/` files.
 - The final wave is docs/polish, alone.

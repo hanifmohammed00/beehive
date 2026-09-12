@@ -29,4 +29,5 @@ heavy_review: "/code-review ultra" # human-run only; the protocol never invokes 
 # leave it `default`, or every curl-and-paste Verifier runs at the strong rate.
 models:
   strong: default                 # Coordinator, Builders, full-gate Reviewer
-  cheap: <cheapest capable model> # Verifier, light-gate Reviewer
+  cheap: <cheapest capable model> # Verifier, standard-gate Reviewer (a `light`
+                                   # gate has no separate Reviewer agent at all)

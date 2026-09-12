@@ -21,7 +21,7 @@ state under `.beehive/` and a pointer in its `CLAUDE.md`.
 
 | File | Role | Authority |
 |---|---|---|
-| `PROTOCOL.md` | The method: three acts, Phase 0, wave partitioning, gates, §Speed, §Economy, §Progress, invariants | **Source of truth.** Everything else defers to it. |
+| `PROTOCOL.md` | The method: three acts, Phase 0, wave partitioning, gates, §Speed, §Economy, §Progress, §Report, invariants | **Source of truth.** Everything else defers to it. |
 | `ROLES.md` | Prompt templates: Interviewer, Coordinator, Builder, Reviewer, Verifier | Must stay consistent with `PROTOCOL.md`; it operationalises it |
 | `ADAPTERS.md` | How to instantiate the roles per platform (Claude Code, Codex CLI/Cloud, Cursor/Aider, manual) | Platform mechanics only — no method decisions here |
 | `SKILL.md` | Claude Code skill entry (`/beehive`), `name: beehive` | Thin dispatch wrapper; points at `PROTOCOL.md` |
@@ -52,7 +52,7 @@ state under `.beehive/` and a pointer in its `CLAUDE.md`.
 
 - Change `PROTOCOL.md` first, then propagate to `ROLES.md` / `SKILL.md` /
   `README.md` / `templates/`. Grep for the term you changed.
-- Keep the version line at the top of `PROTOCOL.md` current (`v0.5` now).
+- Keep the version line at the top of `PROTOCOL.md` current (`v0.6` now).
   Bump minor for a new rule or field; note what changed in the `<!-- -->`
   comment under the version line.
 - Step numbers in `PROTOCOL.md` §ACT 3 are referenced from `ROLES.md` and
@@ -65,4 +65,4 @@ state under `.beehive/` and a pointer in its `CLAUDE.md`.
 
 `README.md` has it. Short version: `ln -s "$(pwd)" ~/.claude/skills/beehive`
 then `/beehive` in any project. Public repo:
-`github.com/hanifmohammed00/beehive` (MIT). `v0.5` current.
+`github.com/hanifmohammed00/beehive` (MIT). `v0.6` current.
