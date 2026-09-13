@@ -1,23 +1,32 @@
-# Beehive — platform adapters
+# Beehive — Claude Code mechanics
 
-The protocol needs three things a platform must provide its own way:
-**(a)** a Builder scoped to one phase, **(b)** a Reviewer and Verifier that
-are fresh instances with no exposure to the Builder, **(c)** optionally,
-parallel Builders. Everything else is plain git + shell + files.
+Mechanics for running the protocol's roles inside Claude Code: **(a)** a
+Builder scoped to one phase, **(b)** a Reviewer and Verifier that are fresh
+instances with no exposure to the Builder, **(c)** parallel Builders when a
+wave is wide. Everything else is plain git + shell + files.
 
 ---
-
-## Claude Code
 
 - **Coordinator**: the main session, or `/beehive` (skill wrapper reads
   `config.yml` and runs the Coordinator role).
 - **Builder**: `Agent` tool, `subagent_type: general-purpose`, one call per
   phase. Parallel builders in one wave → `isolation: "worktree"` +
-  `run_in_background: true`, then collect. `model: {models.strong}`. On a
-  metered plan, dispatch ~2–3 at a time rather than the whole wave width — a
-  rate-limit mid-wave costs more than the parallelism saved, and a
-  rate-limited Reviewer/Verifier (no artifact until it finishes) is a total
-  loss paid twice.
+  `run_in_background: true`, then collect. `model: {models.strong}` for a
+  `risk: empirical` phase, `model: {models.cheap}` for every routine phase
+  (§Speed lever 9 — resolve this per-phase, not one blanket model for every
+  Builder in the wave). On a metered plan, dispatch ~2–3 at a time rather
+  than the whole wave width — a rate-limit mid-wave costs more than the
+  parallelism saved, and a rate-limited Reviewer/Verifier (no artifact until
+  it finishes) is a total loss paid twice.
+  - **Before a batched dispatch, confirm distinctness — not after.** A real
+    run lost ~200k tokens when two parallel Builder dispatches both
+    inherited the Coordinator's own ambient cwd at the exact moment of a
+    batched call — one agent caught the collision and correctly stopped,
+    the other correctly refused a follow-up message claiming it was
+    harmless, rather than trust an instruction over its own sandbox
+    assignment. Before firing a batch of parallel `Agent` calls, list the
+    worktree paths just created and check they're actually distinct;
+    checking after dispatch is checking too late.
   - A `risk: empirical` phase: the Builder's first deliverable is the spike
     script + `.beehive/wave-N/spike-K.md`, before the real build.
   - If `isolation: "worktree"` isn't available (it needs VCS hooks the
@@ -59,7 +68,11 @@ parallel Builders. Everything else is plain git + shell + files.
   Verifier and standard-gate Reviewer take `model: {models.cheap}` — pass
   it explicitly on the `Agent` call's `model` parameter; a `light` gate has
   no separate Reviewer agent, so there's no third case to handle. Point
-  them at `wave-N-int` (the integration branch) / its diff.
+  them at `wave-N-int` (the integration branch) / its diff — or, if this
+  gate is also covering a deferred earlier wave (`PROTOCOL.md` §ACT 3 step
+  4, §Speed lever 4), diff from the branch point *before* that deferred
+  wave instead of its immediate parent, so those phases are actually in
+  scope and not silently excluded because they already merged.
 - **Concurrent tests**: run the `config.test` commands as parallel
   background `Bash` calls, then read both results.
 - **Heavy review**: the human runs `config.heavy_review` (e.g.
@@ -79,50 +92,3 @@ parallel Builders. Everything else is plain git + shell + files.
   session's own total cost/context display (e.g. `/cost`, or the terminal
   UI) — that's whole-session, not broken out per role, so it belongs in
   the human's own notes, not something the Coordinator can fill in.
-
-## Codex — CLI (`codex` / `codex exec`)
-
-- **Coordinator**: the interactive `codex` session.
-- **Builder**: `codex exec` per phase, sequential, prompt = `ROLES.md`
-  §Builder with slots filled. Each writes its own branch.
-- **Reviewer / Verifier**: a *separate* `codex exec` run pointed at the
-  diff (`git diff <working-branch>...wave-N-int`) — new process, no shared
-  context, so isolation holds. Prompt from `ROLES.md`.
-- **Parallel**: not native; the human can launch multiple Codex Cloud tasks
-  (below) for one wave's phases and merge the branches.
-
-## Codex — Cloud tasks
-
-- **Builder**: one cloud task per phase in the wave, prompt from `ROLES.md`
-  §Builder — these run in parallel natively, each producing a branch/PR.
-- **Integrate**: the human (or Coordinator task) merges the phase branches.
-- **Reviewer / Verifier**: a separate cloud task per role, scoped to the
-  merged branch's diff.
-- No skill needed — point `AGENTS.md` at `.beehive/PROTOCOL.md`.
-
-## Cursor / Aider / other single-session tools
-
-- **Coordinator + Builder**: the session, one phase at a time.
-- **Reviewer / Verifier**: a new chat (Cursor) or a fresh `aider` invocation
-  (`aider --message "$(fill ROLES.md §Reviewer)"`) against the diff — new
-  context = isolation.
-- **Parallel**: none; run phases sequentially within a wave.
-
-## Manual multi-agent (any mix of vendors)
-
-- Human is the Coordinator. Open one agent window per phase for Builders,
-  merge their branches, then open a *different* window (any vendor) for the
-  Reviewer and another for the Verifier, pasting the role prompts.
-- The `.beehive/` files are the shared state — every window reads and
-  writes there.
-
----
-
-## AGENTS.md / CLAUDE.md pointer
-
-Add once, so any tool entering the repo finds the method:
-
-```
-Multi-phase features follow .beehive/PROTOCOL.md — interview to a
-phase-spec, build in waves with independent review + verify gates.
-```

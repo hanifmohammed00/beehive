@@ -54,11 +54,15 @@ create it — starting points for `config.yml`, `brief.md`, and
   are always fresh subagents, never a Builder; Builders get only their
   phase's scope; test output is pasted raw; two phases sharing a `hot_file`
   never share a wave; a `risk: empirical` phase spikes before it builds;
-  fix findings go back to the same Builder warm; the Verifier and
-  standard-gate Reviewers run on `models.cheap` — resolve and pass this
-  explicitly on every spawn, never rely on it defaulting.
-- The Coordinator does not write feature code — only merges, test runs,
-  reports, progress, and doc edits.
+  fix findings go back to the same Builder warm; the Verifier, standard-gate
+  Reviewers, and every routine Builder run on `models.cheap` — only full-gate
+  Reviewers and `risk: empirical` Builders get `models.strong` (§Speed lever
+  9) — resolve and pass this explicitly on every spawn, never rely on it
+  defaulting.
+- The Coordinator does not write phase code — Builders do, so a fresh
+  Reviewer can judge it unseen. Exception: small glue/fix work that a
+  still-pending gate will cover (`PROTOCOL.md` §Roles) — never code that
+  skips review entirely.
 - Never invoke `config.yml` `heavy_review` — name it in the wave report for
   the user to run.
 - In `autobuild`, do not pause the run to ask the user anything except when

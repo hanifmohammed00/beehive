@@ -1,6 +1,68 @@
-# Beehive Protocol v0.6
+# Beehive Protocol v0.7
 
-<!-- v0.6: §Report — each wave report gets a best-effort `tokens` field (per
+<!-- v0.7: token-cost findings from a second real run (wells-frogo
+     "future-features", mid-run: 5 waves, 11 phases, repeated spend-limit
+     hits). `digest.md` refresh now compacts instead of only appending — a
+     live run's digest had grown to 234 lines against its own ~150-line
+     budget by wave 2, entirely from per-wave "what changed" sections never
+     folded back in, and every role re-reads the whole file every wave.
+     Reviewer is now scoped to its own wave's phases in `phase-spec.md`, not
+     the whole file — matching what the Verifier's prompt already said — since
+     an 11-phase, 615-line spec was being read in full by a Reviewer checking
+     a 3-phase wave. §ACT 3 step 1 said "spawn all of the wave's Builders at
+     once", directly contradicting §Speed lever 10's own staggering cap; the
+     run hit exactly this in wave 3 (3 builders plus a still-live Reviewer
+     crashed together on one spend-limit hit), so step 1 now spawns up to the
+     cap and backfills, and lever 10 now says a limit-triggered crash is a
+     signal to cut the cap further for the rest of the run, not just resume
+     the same width. §Speed lever 4 (risk-proportional gates) now covers
+     *when* a gate runs, not just how deep: a leaf phase (nothing later
+     `depends_on` it) can have its Review+Verify deferred and folded into a
+     later wave's gate, guarded so it can't be forgotten — `wave-plan.md`
+     records it, the combined gate's diff must span back to cover it, and
+     `100% · complete` can't be reported with one still outstanding. This
+     formalizes a call the human made by hand mid-run (defer the leaf
+     frontend wave's gate into the final wave; keep every backend/contract
+     wave's gate immediate, since bugs in those compound into what's built on
+     them next) after checking it against the same rework-compounding
+     argument §Speed already makes — a phase anything later depends on still
+     gates at its own wave, unchanged. §Economy gets one rule that ponytail
+     itself doesn't have: minimal in-code comments in the Builder's diff, not
+     just a bounded prose report around it — a verbose diff gets paid for
+     again by every Reviewer, Verifier, and later Builder who reads it.
+     §Speed lever 9 (model tiering) now routes by stakes, not by role name:
+     the same run reserved its strong model for full-gate Reviewers and
+     `risk: empirical` Builders specifically — where a wrong call is
+     expensive to discover late — and ran every routine Builder on the cheap
+     tier instead of strong-by-default, with no drop in what the gate caught
+     (the fresh Reviewer still catches what a cheaper Builder misses; that's
+     the isolation guarantee doing its job regardless of which tier wrote the
+     diff). Still two tiers, just re-routed; this is a cost lever, not a
+     token-count one, same as the rest of lever 9. Five more findings from
+     the same run's post-mortem: (1) a fix round can cost nearly as much as
+     the phase's original build — §ACT 3 step 1 now says that's a signal the
+     resume didn't actually stay warm, not that fixes are inherently
+     expensive, and to check the per-role `tokens` field rather than assume.
+     (2) The run's single worst dispatch mistake — two parallel Builders
+     inheriting the Coordinator's own ambient cwd, ~200k tokens lost — wasn't
+     caught until both agents were already confused; `ADAPTERS.md` now
+     requires confirming worktree paths are distinct *before* a batched
+     dispatch, not after. (3) Lever 10's crash-cut-the-cap rule now adds:
+     when crashes cluster at spawn/first-resume rather than spread through a
+     wave (this run: 10 of 14), the trigger is spawn *simultaneity*, not
+     sustained width — stagger the dispatches themselves. (4) §Report's
+     `tokens` field can be actively wrong, not just absent: a resume call
+     that reports only its own (small) cost after the real work finished
+     pre-crash looks like a cheap pass that was actually expensive elsewhere
+     — flag it rather than fold it in silently. (5) The Coordinator writing
+     small glue/fix code itself, instead of spawning a Builder, measured at
+     zero marginal subagent cost for exactly that pattern in this run — now
+     a named, narrow exception in §Roles, guarded by "a gate still has to
+     cover it." Beehive is also Claude Code-only as of this version —
+     `ADAPTERS.md` dropped its Codex/Cursor/Aider/manual sections and the
+     platform-neutral framing came out of this file, `ROLES.md`, and
+     `README.md`.
+     v0.6: §Report — each wave report gets a best-effort `tokens` field (per
      role) and a `mechanisms` checklist recording which v0.5 levers actually
      fired this wave (spike ran, cheap model used, tests.log reused,
      checkpointed, concurrency staggered) instead of just what the spec
@@ -39,22 +101,22 @@
      behaviour; resume-a-dead-builder rule; deferrals must be tracked;
      archive a prior run; Verifier seeds its own data. -->
 
-A platform-neutral method for taking a feature from a messy brain-dump to
-merged code: interview the human into a spec, partition the spec into waves
-that build in parallel where safe, and gate each wave behind an independent
-review and a real end-to-end verification.
+A method, run as a Claude Code skill, for taking a feature from a messy
+brain-dump to merged code: interview the human into a spec, partition the
+spec into waves that build in parallel where safe, and gate each wave behind
+an independent review and a real end-to-end verification.
 
 Speed comes from **breaking dependencies so more work is parallel** — an
 interface-first Phase 0, risk-proportional gates, and pipelined
 review/verify — not from throwing more builders at a chain. See §Speed.
 
-Runnable by one agent working alone, an orchestrator that spawns subagents,
-or a human coordinating several agent sessions — on Claude Code, Codex,
-Cursor, Aider, or by hand. All state lives in `.beehive/`; any agent on
-any platform resumes by reading it.
+The Coordinator role (`ROLES.md`) runs this from a Claude Code session,
+spawning Builders/Reviewers/Verifiers as subagents (`ADAPTERS.md` for the
+mechanics). All state lives in `.beehive/`; a Coordinator session resumes a
+run by reading it, even after dropping its own context.
 
-Vendor this file, `ROLES.md`, and `ADAPTERS.md` unchanged into any repo.
-The project supplies `config.yml` and `brief.md`.
+Install this directory as the Claude Code skill (`README.md`). The target
+repo supplies `config.yml` and `brief.md`.
 
 ---
 
@@ -137,7 +199,13 @@ under ~150 lines; it is a pointer sheet, not a copy of the codebase.
 **Refresh:** after each wave merges, the Coordinator patches the digest with
 what actually changed — new/renamed helpers, moved files, new signatures —
 in a few lines, so the next wave's Builders read current reality, not the
-intake-time snapshot.
+intake-time snapshot. **This replaces, it doesn't accumulate:** fold the
+change into the relevant existing section (conventions, file map,
+signatures) instead of appending a new dated "what changed this wave" block
+every time, and delete whatever a later wave has superseded. Every role
+re-reads this file in full, every wave — a line you leave in gets paid for
+again at every spawn. If a refresh finds the digest already past ~150 lines,
+that refresh trims it back down, not just adds to it.
 
 ### `config.yml`
 
@@ -155,10 +223,11 @@ test:                                 # full suite — every command exit 0 to p
 test_quick: "pytest backend/ -k {phase_area}"  # optional; the fast subset a Builder runs while iterating
 boot: "npm --prefix frontend run dev" # verifier only; optional
 heavy_review: "/code-review ultra"    # human-run; the protocol never invokes it
-models:                               # per-role model when the platform supports it
-  strong: default                     # Coordinator, Builder, full-gate Reviewer
-  cheap: <cheapest capable model>     # Verifier, standard-gate Reviewer — the Interviewer
-                                      # sets this; leaving it `default` wastes real cost
+models:                               # per-role model, routed by stakes (§Speed lever 9)
+  strong: default                     # Coordinator, full-gate Reviewer, risk:empirical Builder
+  cheap: <cheapest capable model>     # Verifier, standard-gate Reviewer, every routine
+                                      # Builder — the Interviewer sets this; leaving it
+                                      # `default` wastes real cost on every one of them
                                       # (a `light` gate has no separate Reviewer agent at
                                       # all — the Coordinator eyeballs it itself, so there
                                       # is no such thing as a "light-gate Reviewer" to route)
@@ -171,17 +240,29 @@ models:                               # per-role model when the platform support
 | Role | Receives | Must NOT have | Edits code |
 |---|---|---|---|
 | Interviewer | `brief.md`, `context`, repo read access | — | writes `phase-spec.md` / `config.yml` / `digest.md` only |
-| Coordinator | everything | — | merges + docs only |
+| Coordinator | everything | — | merges + docs; small glue/fix code if a gate still covers it (below) |
 | Builder | its phase's section + `digest.md` + `conventions` | other phases' details | its phase's `touches` only |
-| Reviewer | the wave diff + `phase-spec.md` + `digest.md` | any Builder's session or reasoning | no |
-| Verifier | the merged wave branch + `digest.md` | any Builder's session or reasoning | no |
+| Reviewer | the wave diff + **this gate's phases** in `phase-spec.md` + `digest.md` | any Builder's session or reasoning; phases outside this gate | no |
+| Verifier | the merged wave branch + **this gate's phases** in `phase-spec.md` + `digest.md` | any Builder's session or reasoning; phases outside this gate | no |
 
 Roles read `.beehive/digest.md` for repo context instead of re-exploring
 from raw files. A Builder still opens the specific files in its `touches`.
 
 **Reviewer and Verifier MUST be a fresh agent instance / new session /
-different person.** That isolation is the point — how a platform achieves it
-is in `ADAPTERS.md`. Prompts for each role are in `ROLES.md`.
+different person.** That isolation is the point — how this is done in
+Claude Code is in `ADAPTERS.md`. Prompts for each role are in `ROLES.md`.
+
+**A narrow exception for the Coordinator:** small, sequential glue or fix
+work that doesn't need Builder isolation — a final polish phase, a fix
+round after every Builder for the run is done — can be written by the
+Coordinator directly instead of spawned as a fresh Builder, *when a
+Review/Verify gate is still going to cover it* before the run reports
+complete (the final combined gate, most often). This is not a way to skip
+review — the code still has to land inside a wave whose gate checks it, same
+as any Builder's diff; it differs only in who held the pen. A real run
+measured this at zero marginal subagent cost for exactly this pattern (a
+docs/polish phase plus two post-build fix rounds) — the saving is real, but
+it only holds because a gate downstream still caught it.
 
 ---
 
@@ -225,6 +306,12 @@ lets most of the rest land in wave 2 together. If the partition still comes
 out as a long chain, that is a signal Phase 0 missed a shared contract or a
 `hot_file` needs splitting (§Speed) — say so in `wave-plan.md`.
 
+While computing the `depends_on` closure, also mark which phases are
+**leaves** — nothing in any later wave `depends_on` them. A leaf is the only
+kind of phase §Speed lever 4 allows gating later than its own wave; note each
+wave's leaves in `wave-plan.md` even if you decide to gate them immediately
+anyway, so the option is visible without recomputing the graph later.
+
 Write `wave-plan.md`: the partition, and one line of reasoning per wave.
 `mode: autobuild` → continue straight into Act 3 and spawn wave 1's Builders
 in the same turn — the plan file is a record, not a checkpoint. `mode:
@@ -236,13 +323,17 @@ Through every step below the Coordinator keeps `.beehive/wave-N/status` at
 the current stage — one of `building | integrating | testing | review |
 verify | blocked | merged` — so a resuming agent knows where the wave stopped.
 
-1. **Build (concurrent)** — spawn **all** of the wave's Builders at once
-   (`ROLES.md` §Builder), each on branch `wave-N/phase-K`, each in its own
-   worktree/checkout (`ADAPTERS.md` for the mechanics — and for making the
-   gitignored deps a build needs, like a venv or `node_modules`, present in
-   each worktree). The Coordinator does not block on one before starting the
-   next — it launches them, then collects. A single-phase wave is just one
-   Builder. Builder writes `.beehive/wave-N/build/phase-K.md` (≤15 lines:
+1. **Build (concurrent, capped)** — spawn the wave's Builders up to the
+   concurrency cap (default ~2–3 on a metered plan — §Speed lever 10), each
+   on branch `wave-N/phase-K`, each in its own worktree/checkout
+   (`ADAPTERS.md` for the mechanics — and for making the gitignored deps a
+   build needs, like a venv or `node_modules`, present in each worktree). The
+   Coordinator does not block on one before starting the next *within the
+   cap* — launch up to the cap, then backfill one at a time as each finishes,
+   rather than waiting for a full batch before starting more. A wave narrower
+   than the cap is just spawn-all; the cap only matters once a wave is wider
+   than it. A single-phase wave is just one Builder. Builder writes
+   `.beehive/wave-N/build/phase-K.md` (≤15 lines:
    what changed, deviations, new files). While iterating, a Builder runs
    `config.test_quick` (fast subset); the full suite is the gate's job.
    **Spike first if `risk: empirical`.** Before writing the real
@@ -262,7 +353,11 @@ verify | blocked | merged` — so a resuming agent knows where the wave stopped.
    back to the same Builder, context intact** (same-session continuation
    where the platform supports it — `ADAPTERS.md`), not to a fresh instance
    that re-reads the phase, the digest, and every touched file. Cold-start a
-   fix Builder only if the original is unrecoverable.
+   fix Builder only if the original is unrecoverable. **A fix round costing
+   nearly as much as the phase's original build is a signal the resume
+   didn't actually stay warm** — check the per-role `tokens` field (§Report)
+   rather than assume; a fix round should cost roughly what the findings
+   take to read and act on, not a second full build.
    **A resume the Coordinator doesn't actively drive doesn't happen.**
    Dispatching a role and waiting is not a liveness check — a crashed agent
    that nobody re-pings stays crashed, silently, for the rest of the run.
@@ -296,6 +391,21 @@ verify | blocked | merged` — so a resuming agent knows where the wave stopped.
      wave added, hand-check the numbers → `.beehive/wave-N/verify.md`. A
      clean checkout has no runtime state — the Verifier seeds what it needs
      from fixtures or a documented import, never the user's live data.
+   **Deferring a leaf phase's gate.** If every phase in this wave is a leaf —
+   nothing in a later wave `depends_on` it (§ACT 2 marks these in
+   `wave-plan.md`) — this wave's Review+Verify can be skipped now and folded
+   into a later wave's gate instead (the final wave, typically); the test
+   gate (step 3) still applies before merge, same as any wave. When the
+   fold-in wave runs its gate, the diff it reviews must span back to the last
+   point the deferred wave was actually reviewed, not just its own wave — a
+   plain `wave-N-int` diff against the now-current working branch would
+   silently exclude the very phases you deferred. Note the deferral in
+   `wave-plan.md` the moment you decide it. A wave with any non-leaf phase
+   keeps its gate now — deferring a phase later work still builds on is the
+   "review everything at the end" pattern §Speed rules out, not this. A
+   deferred gate is a debt: the run can't report `100% · complete` while one
+   is outstanding, and whichever wave clears it must cover every deferred
+   wave's diff, not just its own.
    The Reviewer does **not** re-run `config.test` — it reads
    `.beehive/wave-N/tests.log` from step 3 (same tree, minutes old) and
    judges the diff. The Verifier re-runs `config.test` only if it has a
@@ -387,12 +497,18 @@ fields on the wave report (§ACT 3 step 5) close that gap, best-effort —
 leave a field out or `n/a` rather than guess:
 
 - **`tokens`** — per role, this wave's token usage, if the platform
-  surfaces it (§ADAPTERS.md has the mechanics per platform). This is where
-  the cost actually went, not an estimate from phase `weight`.
+  surfaces it (`ADAPTERS.md` has the mechanics). This is where the cost
+  actually went, not an estimate from phase `weight`. A number sourced from
+  a crash's resume call — where the resume reports only its own cost after
+  the real pass had already finished before the crash notice arrived — is
+  not the pass's true cost; flag it as unreliable in the report body rather
+  than folding it into the total silently.
 - **`mechanisms`** — what the Coordinator actually did this wave, not what
   the spec says it should do: which phases' `risk: empirical` spike ran
-  (`spiked`), whether the Verifier and standard-gate Reviewers ran on
-  `models.cheap` (`model_tiering`), whether the Reviewer read `tests.log`
+  (`spiked`), whether routing actually followed §Speed lever 9 — `strong`
+  only for full-gate Reviewers and `risk: empirical` Builders, `cheap` for
+  the Verifier, standard-gate Reviewers, and every routine Builder
+  (`model_tiering`), whether the Reviewer read `tests.log`
   instead of re-running the suite (`tests_reused`), whether Reviewer/Verifier
   checkpointed their output instead of writing once at the end
   (`checkpointed`), and how many Builders ran at once (`staggered`). The
@@ -446,7 +562,14 @@ ceiling:
 4. **Risk-proportional gates** (§ACT 3 step 4) — a `weight: 1` docs phase
    does not need a fresh Reviewer and a Verifier boot. Save the full triad
    for the `weight: 5+` phases. And a fix-recheck is gated by the *fix*, not
-   the phase — a copy tweak doesn't earn a second full Verifier pass.
+   the phase — a copy tweak doesn't earn a second full Verifier pass. A
+   **leaf phase** — nothing later `depends_on` it — can take this further
+   than "lighter": deferred, folded entirely into a later wave's gate,
+   because there is no downstream build left that can inherit a bug it
+   hasn't caught yet (§ACT 3 step 4 has the mechanics and the guardrail). A
+   phase anything later depends on keeps its own wave's gate regardless of
+   weight — deferring *that* one is the "review everything at the end"
+   pattern below, not this lever.
 5. **Pipelined gates** (§ACT 3 step 5) — Review/Verify of wave N overlap
    the build of wave N+1.
 6. **Tight inner loop** — `config.test_quick` while a Builder iterates,
@@ -455,29 +578,51 @@ ceiling:
    fresh agent re-reading the repo (also the main token lever, below).
 8. **Concurrent test commands** — backend ∥ frontend at the gate, not
    back-to-back.
-9. **Model tiering** (`config.models`) — strong model for Coordinator,
-   Builders, and full-gate Reviewers (the ones backed by nothing else, or
-   judging the highest-weight phases); a cheaper/faster one for the
-   Verifier (curl-and-paste evidence work) and the standard-gate Reviewer
-   (weight 3–4, lower stakes than full). A `light` gate has no separate
-   Reviewer agent at all — there is no third, cheaper tier to route; don't
-   go looking for a "light-gate Reviewer" instance, it doesn't exist. Route
-   by the Roles table — this is not advisory. The Interviewer sets
-   `models.cheap`; a run that leaves it `default` pays the strong-model rate
-   for every curl-and-paste Verifier. Doesn't cut token *count*, cuts cost.
+9. **Model tiering** (`config.models`) — route by **stakes, not role name**:
+   `models.strong` for the Coordinator, full-gate Reviewers, and `risk:
+   empirical` Builders — the three places a wrong call is expensive to
+   discover late (the Coordinator's partition/merge/gate calls have nothing
+   else behind them; a full-gate Reviewer is the only check on a foundation
+   other phases build on; a bad spike green-lights the wrong approach for
+   the whole phase); `models.cheap` for everything else — the Verifier
+   (curl-and-paste evidence work), the standard-gate Reviewer (weight 3–4,
+   lower stakes than full), and every *routine* Builder. Routine Builders
+   default to `cheap`, not `strong`: once Phase 0 has landed the contracts,
+   most phases are ordinary implementation, and the fresh Reviewer still
+   catches what a cheaper model misses — that's the isolation guarantee
+   doing its job, not a gap this leaves open. A `light` gate has no separate Reviewer agent at
+   all — there is no third, cheaper tier to route; don't go looking for a
+   "light-gate Reviewer" instance, it doesn't exist. This routing is not
+   advisory. The Interviewer sets `models.cheap`; a run that leaves it
+   `default` pays the strong-model rate for every curl-and-paste Verifier
+   *and* every routine Builder. Doesn't cut token *count*, cuts cost.
 10. **Stagger concurrency on a metered plan.** N concurrent Builders burn
     ~N× the token rate; a rate-limit mid-wave costs more than the
     parallelism saved, and a rate-limited Reviewer/Verifier is *pure* loss
     (no artifact until it finishes). Widen the graph at spec time, but run
-    ~2–3 agents at once, not the whole wave width. Reviewer and Verifier
-    checkpoint their output as they go (§Economy) so a killed one resumes.
+    ~2–3 agents at once, not the whole wave width (§ACT 3 step 1 — spawn up
+    to the cap, backfill the rest as slots free, never the whole wave at
+    once). Reviewer and Verifier checkpoint their output as they go
+    (§Economy) so a killed one resumes. A crash attributable to a spend/rate
+    limit is a signal to cut the cap further for the rest of the run, not
+    just to resume at the same width — a real run that lost 4 agents (3
+    Builders and a Reviewer) to one simultaneous limit hit dropped to one
+    agent at a time for everything after. Record the new cap as a dated note
+    in `digest.md` (alongside `models.cheap`-style decisions) so later waves
+    inherit it without re-deciding. **If crashes cluster at spawn or first
+    resume rather than spread through a wave's runtime** (one run: 10 of 14),
+    the trigger is likely the *simultaneity* of the spawn moment, not
+    sustained concurrent width — stagger the dispatches themselves (a beat
+    between each `Agent` call in a batch), not just a lower cap.
 
 What does **not** help: adding builders to an existing chain (they idle),
 or "build everything then review once at the end" (late-caught foundation
 bugs force rework of everything above them — the per-wave gate is the cheap
-place to catch them). The de-risk equivalent: committing a full
-Builder→Reviewer→Verifier cycle to a phase whose approach was never checked
-against real data — spike it first (§ACT 3 step 1, `risk: empirical`).
+place to catch them; a **leaf** phase is the one exception, lever 4, since it
+has no "everything above it" left to protect). The de-risk equivalent:
+committing a full Builder→Reviewer→Verifier cycle to a phase whose approach
+was never checked against real data — spike it first (§ACT 3 step 1, `risk:
+empirical`).
 
 ---
 
@@ -496,6 +641,14 @@ report, not volume.
   scaffolding "for later", no config for a value that never changes. The
   smallest change *in the right place* — a guard in the shared function, not
   in every caller.
+- **Minimal comments in the diff itself** — this is a rule ponytail doesn't
+  carry, add it explicitly. No docstring that restates the signature, no
+  line-by-line narration, no header banner. A comment earns its place only
+  for a non-obvious constraint or a workaround a future reader would
+  otherwise undo — that includes a `ponytail:` marker. Every line here is a
+  line the Reviewer, the Verifier, and every later Builder reading the diff
+  also pays to read; it's the same tax as unbounded prose, just paid inside
+  the code instead of around it.
 - **Context is rationed.** Each role gets only what its table row allows.
   Roles read `.beehive/digest.md` for repo context — one shared exploration,
   not one per agent. A Builder additionally opens the specific files in its
@@ -557,6 +710,13 @@ report, not volume.
 - A crashed role is actively resumed and tracked (`resume` / `stuck` in the
   wave report), never silently left — a wave cannot report `status: passed`
   while any role is `stuck`.
+- A deferred gate (§Speed lever 4) is recorded in `wave-plan.md`, not
+  silent — the run cannot report `100% · complete` while one is still
+  outstanding, and whatever wave clears it must cover every deferred wave's
+  diff, not just its own.
+- Coordinator-authored code (§Roles exception) is not exempt from a gate —
+  it must fall inside a wave whose Review/Verify still covers it, same as
+  any Builder's diff.
 - Test results are pasted as raw output, never summarized as "passed".
 - All cross-role handoff goes through `.beehive/` files.
 - The final wave is docs/polish, alone.

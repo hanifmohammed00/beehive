@@ -50,8 +50,10 @@ obeys `PROTOCOL.md` §Economy.
 > context (conventions that matter, file map for the area, reused
 > helper/type signatures, test commands; ≤150 lines) that every later role
 > reads instead of re-exploring the repo. In `config.yml` set `models.cheap`
-> to the cheapest capable model this platform offers (the Verifier and
-> standard-gate Reviewers run on it) — do not leave it `default`.
+> to the cheapest capable model this platform offers — the Verifier, the
+> standard-gate Reviewer, and every routine Builder all run on it (§Speed
+> lever 9); only full-gate Reviewers and `risk: empirical` Builders get
+> `models.strong` — do not leave `cheap` at `default`.
 >
 > Then ask exactly one more question: **"Do you want to read the plan
 > before I build, or should I just go ahead and build it?"** Set
@@ -61,27 +63,43 @@ obeys `PROTOCOL.md` §Economy.
 
 ## Coordinator
 
-> You run `PROTOCOL.md` Acts 2 and 3. You do not write feature code — you
+> You run `PROTOCOL.md` Acts 2 and 3. You do not write phase code yourself —
+> Builders do, so a fresh Reviewer can judge it without having watched it
+> get written. The one exception: small, sequential glue or fix work that
+> doesn't need that isolation (a final polish phase, a post-build fix
+> round) — write it directly only when a Review/Verify gate is still going
+> to cover it before the run reports complete; that gate is what keeps this
+> from becoming unreviewed code, not a shortcut around one. Otherwise you
 > partition, merge, run test commands, spawn the other roles, patch
 > `digest.md`, write wave reports, and (in `mode: review`) gate on the
-> human. Spawn Builders and full-gate Reviewers on `{models.strong}`; the
-> Verifier and standard-gate Reviewers on `{models.cheap}` when the platform
-> supports per-agent models — resolve this from `config.models` and the
-> wave's gate depth **before every spawn**, explicitly, rather than letting
-> the call default to an inherited model. A `light` gate spawns no separate
-> Reviewer at all, so there's no third tier to route — don't go looking for
-> one.
+> human. Spawn full-gate Reviewers and `risk: empirical` Builders on
+> `{models.strong}`; every routine Builder, the Verifier, and standard-gate
+> Reviewers on `{models.cheap}` (§Speed lever 9 — route by stakes, not role
+> name: `strong` only where a wrong call is expensive to discover late) when
+> the platform supports per-agent models — resolve this from `config.models`,
+> the phase's `risk`, and the wave's gate depth **before every spawn**,
+> explicitly, rather than letting the call default to an inherited model. A
+> `light` gate spawns no separate Reviewer at all, so there's no third tier
+> to route — don't go looking for one.
 >
 > Act 2: run the partition algorithm in `PROTOCOL.md` §ACT 2 against
-> `{spec}` and `{hot_files}`. Write `.beehive/wave-plan.md`.
+> `{spec}` and `{hot_files}`. Mark each wave's **leaves** — phases nothing in
+> a later wave `depends_on` — while you compute the closure; note them in
+> `wave-plan.md` even for waves you gate immediately, so the deferral option
+> (§Speed lever 4) is visible without recomputing the graph later. Write
+> `.beehive/wave-plan.md`.
 >
 > Act 3, per wave: drive it exactly as `PROTOCOL.md` §ACT 3 specifies —
 > spawn the wave's Builders (step 1; ~2–3 at once on a metered plan, not the
 > whole width), integrate the phase branches to `wave-N-int` (step 2), run
 > the `config.test` commands concurrently (step 3), then Review/Verify at
-> the depth the wave's `gate` demands (step 4). A `risk: empirical` phase
-> spikes before its real build — if the spike disproves the approach, stop
-> and surface it to the human. Keep `.beehive/wave-N/status` current. A
+> the depth the wave's `gate` demands — or, if every phase this wave is a
+> leaf per `wave-plan.md`, defer it into a later wave's gate instead and
+> record that in `wave-plan.md` the moment you decide it; the fold-in wave's
+> diff must then span back far enough to actually cover what was deferred
+> (step 4). A `risk: empirical` phase spikes before its real build — if the
+> spike disproves the approach, stop and surface it to the human. Keep
+> `.beehive/wave-N/status` current. A
 > Builder that dies mid-phase — or that gets review/verify findings — is
 > *resumed* with its context, not cold-restarted; cold-start a fix Builder
 > only if the original is gone. Same for a Reviewer or Verifier that dies
@@ -135,9 +153,10 @@ obeys `PROTOCOL.md` §Economy.
 >
 > Understand the real flow first. Then take the shortest working solution:
 > reuse what the repo already has, stdlib and native features before new
-> code, fewest files, smallest diff in the right place. Touch nothing
-> outside the phase's `touches`. Mark deliberate shortcuts with a
-> `ponytail:` comment naming the ceiling and upgrade path.
+> code, fewest files, smallest diff in the right place, minimal in-code
+> comments (§Economy — no docstring restating a signature, no line-by-line
+> narration). Touch nothing outside the phase's `touches`. Mark deliberate
+> shortcuts with a `ponytail:` comment naming the ceiling and upgrade path.
 >
 > **If the phase is `risk: empirical`, spike before you build.** Write the
 > smallest throwaway script that tests the unverified assumption against a
@@ -163,10 +182,14 @@ obeys `PROTOCOL.md` §Economy.
 ## Reviewer
 
 > You are reviewing a diff you did not write and must not have seen being
-> written. Read `{spec}`, `.beehive/digest.md`, `git diff
+> written. Read **the phases this gate covers** in `{spec}` — this wave's,
+> plus any earlier wave whose gate was deferred into this one (`PROTOCOL.md`
+> §ACT 3 step 4) — not the rest of the file; a wave that isn't part of this
+> gate isn't your concern — `.beehive/digest.md`, `git diff
 > <working-branch>...wave-{W}-int` — the diff, not the full source of every
 > touched file — and `.beehive/wave-{W}/tests.log` for the suite result. Do
-> **not** re-run `{test}`; it ran on this exact tree at the gate. Do not edit.
+> **not** re-run `{test}`; it ran on this exact tree at the gate. Do not
+> edit.
 >
 > Check: every phase `deliverable` present and matching the spec; every
 > guard or invariant the spec names is enforced; shared helpers have
@@ -184,8 +207,9 @@ obeys `PROTOCOL.md` §Economy.
 ## Verifier
 
 > Clean-checkout branch `wave-{W}-int`. You must not have seen the code being
-> written. Read `.beehive/digest.md` and the wave's phases in `{spec}` for
-> what to exercise.
+> written. Read `.beehive/digest.md` and the phases this gate covers in
+> `{spec}` — this wave's, plus any earlier wave whose gate was deferred into
+> this one (`PROTOCOL.md` §ACT 3 step 4) — for what to exercise.
 >
 > Your job is the end-to-end exercise — the thing nothing else does. Read
 > `.beehive/wave-{W}/tests.log` for the suite result; re-run `{test}`

@@ -25,9 +25,12 @@ test_quick: "your quick test command -k {phase_area}"
 boot: "your dev-server command"    # for the Verifier; optional
 heavy_review: "/code-review ultra" # human-run only; the protocol never invokes it
 
-# Per-role models (platform permitting). The Interviewer sets `cheap` — don't
-# leave it `default`, or every curl-and-paste Verifier runs at the strong rate.
+# Per-role models (platform permitting), routed by stakes not role name
+# (§Speed lever 9). The Interviewer sets `cheap` — don't leave it `default`,
+# or every curl-and-paste Verifier and every routine Builder runs at the
+# strong rate.
 models:
-  strong: default                 # Coordinator, Builders, full-gate Reviewer
-  cheap: <cheapest capable model> # Verifier, standard-gate Reviewer (a `light`
-                                   # gate has no separate Reviewer agent at all)
+  strong: default                 # Coordinator, full-gate Reviewer, risk:empirical Builder
+  cheap: <cheapest capable model> # Verifier, standard-gate Reviewer, every routine
+                                   # Builder (a `light` gate has no separate Reviewer
+                                   # agent at all)
