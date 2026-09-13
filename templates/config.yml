@@ -1,10 +1,10 @@
 # Copy to <target-repo>/.beehive/config.yml and fill in.
 spec: .beehive/phase-spec.md
 conventions: "see CLAUDE.md / AGENTS.md"
-mode: autobuild                    # autobuild (default; runs unattended, never asks to start a wave) | review
+mode: autobuild                    # autobuild (default; runs unattended, never asks to start a swarm) | review
 
 # Large, weakly-bounded files. Any two phases that both touch one of these
-# are forced into separate waves.
+# are forced into separate swarms.
 hot_files:
   - path/to/big/monolithic/file
 
@@ -12,7 +12,7 @@ hot_files:
 context:
   - CLAUDE.md
 
-# Full suite — every command must exit 0 to pass a wave's test gate. From repo root.
+# Full suite — every command must exit 0 to pass a swarm's test gate. From repo root.
 # The Coordinator runs independent commands (backend vs frontend) concurrently.
 test:
   - "your backend test command"
