@@ -1,10 +1,9 @@
 # Beehive — project map
 
-Beehive is a **platform-neutral protocol for building a multi-phase software
+Beehive is a **Claude Code skill for building a multi-phase software
 feature**: interview a messy brief into a phase spec, partition the phases
 into waves that build in parallel where safe, and gate each wave behind an
-independent review + verification. It ships as a Claude Code skill and as
-plain markdown any agent (Codex, Cursor, Aider) or human can follow.
+independent review + verification.
 
 This project is **just documentation** — no code, no build, no test suite.
 The deliverable is the method itself.
@@ -23,7 +22,7 @@ state under `.beehive/` and a pointer in its `CLAUDE.md`.
 |---|---|---|
 | `PROTOCOL.md` | The method: three acts, Phase 0, wave partitioning, gates, §Speed, §Economy, §Progress, §Report, invariants | **Source of truth.** Everything else defers to it. |
 | `ROLES.md` | Prompt templates: Interviewer, Coordinator, Builder, Reviewer, Verifier | Must stay consistent with `PROTOCOL.md`; it operationalises it |
-| `ADAPTERS.md` | How to instantiate the roles per platform (Claude Code, Codex CLI/Cloud, Cursor/Aider, manual) | Platform mechanics only — no method decisions here |
+| `ADAPTERS.md` | How to instantiate the roles in Claude Code (spawning Builders/Reviewers/Verifiers as subagents) | Claude Code mechanics only — no method decisions here |
 | `SKILL.md` | Claude Code skill entry (`/beehive`), `name: beehive` | Thin dispatch wrapper; points at `PROTOCOL.md` |
 | `README.md` | Human-facing: what it is, install, bootstrap | Keep in sync with `PROTOCOL.md` at a summary level |
 | `templates/` | Starting `config.yml` / `brief.md` / `phase-spec.md` for a target repo's `.beehive/` | `config.yml` lists exactly the keys `PROTOCOL.md` §config.yml defines; `phase-spec.md` the fields §Input contract defines |
@@ -42,9 +41,9 @@ state under `.beehive/` and a pointer in its `CLAUDE.md`.
    instead of a scoped one. See `PROTOCOL.md` §Speed "what does not help"
    and the chat rationale for why skip-scope caching / speculative builds /
    persistent verify envs were rejected from the core.
-4. **All cross-role handoff is files under `.beehive/`** — so any platform
-   or session can resume. No mechanism that only works in-memory or
-   in one tool.
+4. **All cross-role handoff is files under `.beehive/`** — so any session
+   can resume. No mechanism that only works in-memory or in one
+   conversation.
 5. **Economy applies to the protocol's own prose too.** If an edit makes a
    section longer without adding a rule, it's probably wrong.
 
@@ -52,7 +51,7 @@ state under `.beehive/` and a pointer in its `CLAUDE.md`.
 
 - Change `PROTOCOL.md` first, then propagate to `ROLES.md` / `SKILL.md` /
   `README.md` / `templates/`. Grep for the term you changed.
-- Keep the version line at the top of `PROTOCOL.md` current (`v0.6` now).
+- Keep the version line at the top of `PROTOCOL.md` current (`v0.7` now).
   Bump minor for a new rule or field; note what changed in the `<!-- -->`
   comment under the version line.
 - Step numbers in `PROTOCOL.md` §ACT 3 are referenced from `ROLES.md` and
@@ -65,4 +64,4 @@ state under `.beehive/` and a pointer in its `CLAUDE.md`.
 
 `README.md` has it. Short version: `ln -s "$(pwd)" ~/.claude/skills/beehive`
 then `/beehive` in any project. Public repo:
-`github.com/hanifmohammed00/beehive` (MIT). `v0.6` current.
+`github.com/hanifmohammed00/beehive` (MIT). `v0.7` current.
