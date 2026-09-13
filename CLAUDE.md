@@ -2,7 +2,7 @@
 
 Beehive is a **Claude Code skill for building a multi-phase software
 feature**: interview a messy brief into a phase spec, partition the phases
-into waves that build in parallel where safe, and gate each wave behind an
+into swarms that build in parallel where safe, and gate each swarm behind an
 independent review + verification.
 
 This project is **just documentation** — no code, no build, no test suite.
@@ -20,7 +20,7 @@ state under `.beehive/` and a pointer in its `CLAUDE.md`.
 
 | File | Role | Authority |
 |---|---|---|
-| `PROTOCOL.md` | The method: three acts, Phase 0, wave partitioning, gates, §Speed, §Economy, §Progress, §Report, invariants | **Source of truth.** Everything else defers to it. |
+| `PROTOCOL.md` | The method: three acts, Phase 0, swarm partitioning, gates, §Speed, §Economy, §Progress, §Report, invariants | **Source of truth.** Everything else defers to it. |
 | `ROLES.md` | Prompt templates: Interviewer, Coordinator, Builder, Reviewer, Verifier | Must stay consistent with `PROTOCOL.md`; it operationalises it |
 | `ADAPTERS.md` | How to instantiate the roles in Claude Code (spawning Builders/Reviewers/Verifiers as subagents) | Claude Code mechanics only — no method decisions here |
 | `SKILL.md` | Claude Code skill entry (`/beehive`), `name: beehive` | Thin dispatch wrapper; points at `PROTOCOL.md` |

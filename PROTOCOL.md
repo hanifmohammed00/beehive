@@ -1,32 +1,32 @@
 # Beehive Protocol v0.7
 
 <!-- v0.7: token-cost findings from a second real run (wells-frogo
-     "future-features", mid-run: 5 waves, 11 phases, repeated spend-limit
+     "future-features", mid-run: 5 swarms, 11 phases, repeated spend-limit
      hits). `digest.md` refresh now compacts instead of only appending — a
      live run's digest had grown to 234 lines against its own ~150-line
-     budget by wave 2, entirely from per-wave "what changed" sections never
-     folded back in, and every role re-reads the whole file every wave.
-     Reviewer is now scoped to its own wave's phases in `phase-spec.md`, not
+     budget by swarm 2, entirely from per-swarm "what changed" sections never
+     folded back in, and every role re-reads the whole file every swarm.
+     Reviewer is now scoped to its own swarm's phases in `phase-spec.md`, not
      the whole file — matching what the Verifier's prompt already said — since
      an 11-phase, 615-line spec was being read in full by a Reviewer checking
-     a 3-phase wave. §ACT 3 step 1 said "spawn all of the wave's Builders at
+     a 3-phase swarm. §ACT 3 step 1 said "spawn all of the swarm's Builders at
      once", directly contradicting §Speed lever 10's own staggering cap; the
-     run hit exactly this in wave 3 (3 builders plus a still-live Reviewer
+     run hit exactly this in swarm 3 (3 builders plus a still-live Reviewer
      crashed together on one spend-limit hit), so step 1 now spawns up to the
      cap and backfills, and lever 10 now says a limit-triggered crash is a
      signal to cut the cap further for the rest of the run, not just resume
      the same width. §Speed lever 4 (risk-proportional gates) now covers
      *when* a gate runs, not just how deep: a leaf phase (nothing later
      `depends_on` it) can have its Review+Verify deferred and folded into a
-     later wave's gate, guarded so it can't be forgotten — `wave-plan.md`
+     later swarm's gate, guarded so it can't be forgotten — `swarm-plan.md`
      records it, the combined gate's diff must span back to cover it, and
      `100% · complete` can't be reported with one still outstanding. This
      formalizes a call the human made by hand mid-run (defer the leaf
-     frontend wave's gate into the final wave; keep every backend/contract
-     wave's gate immediate, since bugs in those compound into what's built on
+     frontend swarm's gate into the final swarm; keep every backend/contract
+     swarm's gate immediate, since bugs in those compound into what's built on
      them next) after checking it against the same rework-compounding
      argument §Speed already makes — a phase anything later depends on still
-     gates at its own wave, unchanged. §Economy gets one rule that ponytail
+     gates at its own swarm, unchanged. §Economy gets one rule that ponytail
      itself doesn't have: minimal in-code comments in the Builder's diff, not
      just a bounded prose report around it — a verbose diff gets paid for
      again by every Reviewer, Verifier, and later Builder who reads it.
@@ -49,7 +49,7 @@
      requires confirming worktree paths are distinct *before* a batched
      dispatch, not after. (3) Lever 10's crash-cut-the-cap rule now adds:
      when crashes cluster at spawn/first-resume rather than spread through a
-     wave (this run: 10 of 14), the trigger is spawn *simultaneity*, not
+     swarm (this run: 10 of 14), the trigger is spawn *simultaneity*, not
      sustained width — stagger the dispatches themselves. (4) §Report's
      `tokens` field can be actively wrong, not just absent: a resume call
      that reports only its own (small) cost after the real work finished
@@ -62,12 +62,12 @@
      `ADAPTERS.md` dropped its Codex/Cursor/Aider/manual sections and the
      platform-neutral framing came out of this file, `ROLES.md`, and
      `README.md`.
-     v0.6: §Report — each wave report gets a best-effort `tokens` field (per
+     v0.6: §Report — each swarm report gets a best-effort `tokens` field (per
      role) and a `mechanisms` checklist recording which v0.5 levers actually
-     fired this wave (spike ran, cheap model used, tests.log reused,
+     fired this swarm (spike ran, cheap model used, tests.log reused,
      checkpointed, concurrency staggered) instead of just what the spec
      says should happen. The Coordinator writes `.beehive/summary.md` on the
-     final wave, aggregating both across the whole run — one file to check
+     final swarm, aggregating both across the whole run — one file to check
      whether a run did what the protocol claims and where its tokens went.
      Crash/resume is now tracked, not assumed: a `resume` field records each
      role's crash→resume cycles, and a role that crashed and never came back
@@ -90,20 +90,20 @@
      end-to-end. Fix findings go back to the same Builder warm, and the
      recheck gate is derived from the fix diff, not the phase. Reviewer /
      Verifier checkpoint their output as they go so a rate-limited one
-     resumes. Coordinator may drop context between waves. Concurrency is
+     resumes. Coordinator may drop context between swarms. Concurrency is
      staggered on metered plans.
      v0.4: autobuild is fully unattended — the Coordinator never asks the
-     user to confirm, approve, or "activate" a wave; wave activation is
+     user to confirm, approve, or "activate" a swarm; swarm activation is
      automatic and the only halt is an unrecoverable block. "Waiting" in
      autobuild always means waiting on another agent, never on the user.
      v0.3: first real run (wells-frogo diversify-search, examples/). Branch
-     names deconflicted (wave-N-int); Phase 0 gate depth by whether it lands
+     names deconflicted (swarm-N-int); Phase 0 gate depth by whether it lands
      behaviour; resume-a-dead-builder rule; deferrals must be tracked;
      archive a prior run; Verifier seeds its own data. -->
 
 A method, run as a Claude Code skill, for taking a feature from a messy
 brain-dump to merged code: interview the human into a spec, partition the
-spec into waves that build in parallel where safe, and gate each wave behind
+spec into swarms that build in parallel where safe, and gate each swarm behind
 an independent review and a real end-to-end verification.
 
 Speed comes from **breaking dependencies so more work is parallel** — an
@@ -126,9 +126,9 @@ repo supplies `config.yml` and `brief.md`.
 ACT 1 — INTAKE   human writes brief.md → Interviewer explores + questions →
                  phase-spec.md (Phase 0 = shared contracts) + config.yml
                  + digest.md → human approves
-ACT 2 — PLAN     Coordinator partitions phases → wave-plan.md → human approves
-ACT 3 — BUILD    per wave: build ∥ → integrate → test → review/verify (depth
-                 by gate) → merge; next wave's build overlaps this one's gates
+ACT 2 — PLAN     Coordinator partitions phases → swarm-plan.md → human approves
+ACT 3 — BUILD    per swarm: build ∥ → integrate → test → review/verify (depth
+                 by gate) → merge; next swarm's build overlaps this one's gates
 ```
 
 At the end of Act 1 the Interviewer asks one last question — **"read the
@@ -136,13 +136,13 @@ plan first, or just build?"** — which sets the autonomy mode for Acts 2–3:
 
 | mode | Act 2/3 gates |
 |---|---|
-| `autobuild` (default) | Coordinator runs every wave start to finish without stopping between phases or waves. Wave activation is automatic — it does **not** ask the user to confirm, approve, or "start" a wave at any point. It writes a report after each wave and updates progress (§Progress), but never waits for a reply. It stops **only** on an unrecoverable block: tests still red after builder retries, a verify fail, or a merge conflict that exposes a spec bug. |
-| `review` | Coordinator additionally stops for human approval after `phase-spec.md`, after `wave-plan.md`, and after every wave report, before continuing. Opt-in — for when the human wants to inspect each step. |
+| `autobuild` (default) | Coordinator runs every swarm start to finish without stopping between phases or swarms. Swarm activation is automatic — it does **not** ask the user to confirm, approve, or "start" a swarm at any point. It writes a report after each swarm and updates progress (§Progress), but never waits for a reply. It stops **only** on an unrecoverable block: tests still red after builder retries, a verify fail, or a merge conflict that exposes a spec bug. |
+| `review` | Coordinator additionally stops for human approval after `phase-spec.md`, after `swarm-plan.md`, and after every swarm report, before continuing. Opt-in — for when the human wants to inspect each step. |
 
 Record the choice in `config.yml` as `mode:`. In `autobuild` a finishing
-phase or wave never returns to the human for permission — the wave report and
+phase or swarm never returns to the human for permission — the swarm report and
 the progress line are a notification the user can read later, not a prompt,
-and the next wave has already begun. "Waiting" in `autobuild` only ever means
+and the next swarm has already begun. "Waiting" in `autobuild` only ever means
 waiting on another agent (a Builder finishing, the Verifier passing), never
 on the user.
 
@@ -182,7 +182,7 @@ behaviour (a migration that runs, a shared function with logic); `gate:
 standard` when it is a behaviour-preserving extraction or a signature-only
 stub — the test gate plus a fresh Reviewer already prove an extraction, and
 a Verifier boot would exercise nothing new. Later phases then `depends_on: [0]`
-instead of on each other, so the partition fans them out into one wave
+instead of on each other, so the partition fans them out into one swarm
 instead of a chain. This is the highest-leverage speed move — do it
 aggressively. A phase that still must depend on another phase's *behaviour*
 (not just its interface) stays a real dependency.
@@ -196,14 +196,14 @@ of helpers/types the phases will reuse, the test commands. Every later role
 that from raw files. One expensive exploration, many cheap reads. Keep it
 under ~150 lines; it is a pointer sheet, not a copy of the codebase.
 
-**Refresh:** after each wave merges, the Coordinator patches the digest with
+**Refresh:** after each swarm merges, the Coordinator patches the digest with
 what actually changed — new/renamed helpers, moved files, new signatures —
-in a few lines, so the next wave's Builders read current reality, not the
+in a few lines, so the next swarm's Builders read current reality, not the
 intake-time snapshot. **This replaces, it doesn't accumulate:** fold the
 change into the relevant existing section (conventions, file map,
-signatures) instead of appending a new dated "what changed this wave" block
-every time, and delete whatever a later wave has superseded. Every role
-re-reads this file in full, every wave — a line you leave in gets paid for
+signatures) instead of appending a new dated "what changed this swarm" block
+every time, and delete whatever a later swarm has superseded. Every role
+re-reads this file in full, every swarm — a line you leave in gets paid for
 again at every spawn. If a refresh finds the digest already past ~150 lines,
 that refresh trims it back down, not just adds to it.
 
@@ -213,11 +213,11 @@ that refresh trims it back down, not just adds to it.
 spec: .beehive/phase-spec.md
 conventions: "see CLAUDE.md / AGENTS.md"
 mode: autobuild                        # autobuild (default) | review
-hot_files:                            # 2 phases touching one → different waves
+hot_files:                            # 2 phases touching one → different swarms
   - backend/app/main.py
 context:                              # minimum every builder reads first — keep short
   - CLAUDE.md
-test:                                 # full suite — every command exit 0 to pass a wave gate
+test:                                 # full suite — every command exit 0 to pass a swarm gate
   - pytest backend/                   # the Coordinator runs these commands concurrently
   - npm --prefix frontend test
 test_quick: "pytest backend/ -k {phase_area}"  # optional; the fast subset a Builder runs while iterating
@@ -242,8 +242,8 @@ models:                               # per-role model, routed by stakes (§Spee
 | Interviewer | `brief.md`, `context`, repo read access | — | writes `phase-spec.md` / `config.yml` / `digest.md` only |
 | Coordinator | everything | — | merges + docs; small glue/fix code if a gate still covers it (below) |
 | Builder | its phase's section + `digest.md` + `conventions` | other phases' details | its phase's `touches` only |
-| Reviewer | the wave diff + **this gate's phases** in `phase-spec.md` + `digest.md` | any Builder's session or reasoning; phases outside this gate | no |
-| Verifier | the merged wave branch + **this gate's phases** in `phase-spec.md` + `digest.md` | any Builder's session or reasoning; phases outside this gate | no |
+| Reviewer | the swarm diff + **this gate's phases** in `phase-spec.md` + `digest.md` | any Builder's session or reasoning; phases outside this gate | no |
+| Verifier | the merged swarm branch + **this gate's phases** in `phase-spec.md` + `digest.md` | any Builder's session or reasoning; phases outside this gate | no |
 
 Roles read `.beehive/digest.md` for repo context instead of re-exploring
 from raw files. A Builder still opens the specific files in its `touches`.
@@ -258,7 +258,7 @@ round after every Builder for the run is done — can be written by the
 Coordinator directly instead of spawned as a fresh Builder, *when a
 Review/Verify gate is still going to cover it* before the run reports
 complete (the final combined gate, most often). This is not a way to skip
-review — the code still has to land inside a wave whose gate checks it, same
+review — the code still has to land inside a swarm whose gate checks it, same
 as any Builder's diff; it differs only in who held the pen. A real run
 measured this at zero marginal subagent cost for exactly this pattern (a
 docs/polish phase plus two post-build fix rounds) — the saving is real, but
@@ -290,57 +290,57 @@ it only holds because a gate downstream still caught it.
 
 ```
 parse phases; compute transitive depends_on closure
-wave = 1; unassigned = all phases
+swarm = 1; unassigned = all phases
 while unassigned:
-  ready = { p in unassigned : every depends_on is in an earlier wave }
+  ready = { p in unassigned : every depends_on is in an earlier swarm }
   selected = []
   for p in ready, ascending phase number:
     if p.touches ∩ (∪ q.touches for q in selected) intersects a hot_file: skip p
     else selected += p
-  assign selected → wave; unassigned -= selected; wave += 1
-last wave = docs/polish only, alone
+  assign selected → swarm; unassigned -= selected; swarm += 1
+last swarm = docs/polish only, alone
 ```
 
-Phase 0 (contracts) is almost always wave 1 alone; a well-factored Phase 0
-lets most of the rest land in wave 2 together. If the partition still comes
+Phase 0 (contracts) is almost always swarm 1 alone; a well-factored Phase 0
+lets most of the rest land in swarm 2 together. If the partition still comes
 out as a long chain, that is a signal Phase 0 missed a shared contract or a
-`hot_file` needs splitting (§Speed) — say so in `wave-plan.md`.
+`hot_file` needs splitting (§Speed) — say so in `swarm-plan.md`.
 
 While computing the `depends_on` closure, also mark which phases are
-**leaves** — nothing in any later wave `depends_on` them. A leaf is the only
-kind of phase §Speed lever 4 allows gating later than its own wave; note each
-wave's leaves in `wave-plan.md` even if you decide to gate them immediately
+**leaves** — nothing in any later swarm `depends_on` them. A leaf is the only
+kind of phase §Speed lever 4 allows gating later than its own swarm; note each
+swarm's leaves in `swarm-plan.md` even if you decide to gate them immediately
 anyway, so the option is visible without recomputing the graph later.
 
-Write `wave-plan.md`: the partition, and one line of reasoning per wave.
-`mode: autobuild` → continue straight into Act 3 and spawn wave 1's Builders
+Write `swarm-plan.md`: the partition, and one line of reasoning per swarm.
+`mode: autobuild` → continue straight into Act 3 and spawn swarm 1's Builders
 in the same turn — the plan file is a record, not a checkpoint. `mode:
 review` → stop for human sign-off first.
 
-### ACT 3 — Build, for each wave N in order
+### ACT 3 — Build, for each swarm N in order
 
-Through every step below the Coordinator keeps `.beehive/wave-N/status` at
+Through every step below the Coordinator keeps `.beehive/swarm-N/status` at
 the current stage — one of `building | integrating | testing | review |
-verify | blocked | merged` — so a resuming agent knows where the wave stopped.
+verify | blocked | merged` — so a resuming agent knows where the swarm stopped.
 
-1. **Build (concurrent, capped)** — spawn the wave's Builders up to the
+1. **Build (concurrent, capped)** — spawn the swarm's Builders up to the
    concurrency cap (default ~2–3 on a metered plan — §Speed lever 10), each
-   on branch `wave-N/phase-K`, each in its own worktree/checkout
+   on branch `swarm-N/phase-K`, each in its own worktree/checkout
    (`ADAPTERS.md` for the mechanics — and for making the gitignored deps a
    build needs, like a venv or `node_modules`, present in each worktree). The
    Coordinator does not block on one before starting the next *within the
    cap* — launch up to the cap, then backfill one at a time as each finishes,
-   rather than waiting for a full batch before starting more. A wave narrower
-   than the cap is just spawn-all; the cap only matters once a wave is wider
-   than it. A single-phase wave is just one Builder. Builder writes
-   `.beehive/wave-N/build/phase-K.md` (≤15 lines:
+   rather than waiting for a full batch before starting more. A swarm narrower
+   than the cap is just spawn-all; the cap only matters once a swarm is wider
+   than it. A single-phase swarm is just one Builder. Builder writes
+   `.beehive/swarm-N/build/phase-K.md` (≤15 lines:
    what changed, deviations, new files). While iterating, a Builder runs
    `config.test_quick` (fast subset); the full suite is the gate's job.
    **Spike first if `risk: empirical`.** Before writing the real
    implementation, the Builder (or the Coordinator in the main thread, if
    it's a few lines) writes the smallest throwaway script that exercises the
    unverified assumption against a real fixture, pastes the result into
-   `.beehive/wave-N/spike-K.md` (≤10 lines), and only then proceeds. If the
+   `.beehive/swarm-N/spike-K.md` (≤10 lines), and only then proceeds. If the
    assumption is false, it stops and kicks the phase back to the human with
    the evidence — a re-spec now is a fraction of a full build→review→verify
    cycle discovering it at the end.
@@ -365,52 +365,52 @@ verify | blocked | merged` — so a resuming agent knows where the wave stopped.
    notification that may never arrive (`ADAPTERS.md` for the mechanics); a
    role with no new output past a reasonable interval gets an explicit
    resume attempt before anything else proceeds. Record every crash→resume
-   cycle in the wave report's `resume` field (§Report) as it happens, not
+   cycle in the swarm report's `resume` field (§Report) as it happens, not
    from memory at gate time. A role that still hasn't come back when the
-   gate is written is **stuck**, not silently dropped — the wave cannot
+   gate is written is **stuck**, not silently dropped — the swarm cannot
    report `status: passed` while any role is stuck.
-2. **Integrate** — Coordinator merges phase branches → branch `wave-N-int`
-   (not `wave-N` — that collides with the `wave-N/phase-K` refs).
+2. **Integrate** — Coordinator merges phase branches → branch `swarm-N-int`
+   (not `swarm-N` — that collides with the `swarm-N/phase-K` refs).
    Resolves conflicts. A conflict that shows two phases disagreed on an
-   interface is a Phase 0 gap: fix it, record it in the wave report.
+   interface is a Phase 0 gap: fix it, record it in the swarm report.
 3. **Test gate** — Coordinator runs the `config.test` commands (full suite),
    **concurrently** where they're independent (backend ∥ frontend). Raw
-   output → `.beehive/wave-N/tests.log`. Any non-zero exit → hand the raw
+   output → `.beehive/swarm-N/tests.log`. Any non-zero exit → hand the raw
    failure to the responsible Builder, repeat step 1 for that phase only.
    Never advance.
 4. **Review + Verify — depth by gate.** Each phase's `gate` (explicit, or
-   derived from `weight`) sets how hard this wave is checked. Take the
-   **deepest** gate among the wave's phases:
+   derived from `weight`) sets how hard this swarm is checked. Take the
+   **deepest** gate among the swarm's phases:
    - `light` — Coordinator eyeballs the diff against `phase-spec.md`. No
      separate agent. No boot.
-   - `standard` — fresh Reviewer on `git diff <working-branch>...wave-N-int`
-     (`ROLES.md` §Reviewer) → `.beehive/wave-N/review.md`. No separate
+   - `standard` — fresh Reviewer on `git diff <working-branch>...swarm-N-int`
+     (`ROLES.md` §Reviewer) → `.beehive/swarm-N/review.md`. No separate
      Verifier; the test gate stands in.
    - `full` — Reviewer **and** a fresh Verifier (`ROLES.md` §Verifier):
      clean checkout, `config.boot`, exercise the real user-facing paths this
-     wave added, hand-check the numbers → `.beehive/wave-N/verify.md`. A
+     swarm added, hand-check the numbers → `.beehive/swarm-N/verify.md`. A
      clean checkout has no runtime state — the Verifier seeds what it needs
      from fixtures or a documented import, never the user's live data.
-   **Deferring a leaf phase's gate.** If every phase in this wave is a leaf —
-   nothing in a later wave `depends_on` it (§ACT 2 marks these in
-   `wave-plan.md`) — this wave's Review+Verify can be skipped now and folded
-   into a later wave's gate instead (the final wave, typically); the test
-   gate (step 3) still applies before merge, same as any wave. When the
-   fold-in wave runs its gate, the diff it reviews must span back to the last
-   point the deferred wave was actually reviewed, not just its own wave — a
-   plain `wave-N-int` diff against the now-current working branch would
+   **Deferring a leaf phase's gate.** If every phase in this swarm is a leaf —
+   nothing in a later swarm `depends_on` it (§ACT 2 marks these in
+   `swarm-plan.md`) — this swarm's Review+Verify can be skipped now and folded
+   into a later swarm's gate instead (the final swarm, typically); the test
+   gate (step 3) still applies before merge, same as any swarm. When the
+   fold-in swarm runs its gate, the diff it reviews must span back to the last
+   point the deferred swarm was actually reviewed, not just its own swarm — a
+   plain `swarm-N-int` diff against the now-current working branch would
    silently exclude the very phases you deferred. Note the deferral in
-   `wave-plan.md` the moment you decide it. A wave with any non-leaf phase
+   `swarm-plan.md` the moment you decide it. A swarm with any non-leaf phase
    keeps its gate now — deferring a phase later work still builds on is the
    "review everything at the end" pattern §Speed rules out, not this. A
    deferred gate is a debt: the run can't report `100% · complete` while one
-   is outstanding, and whichever wave clears it must cover every deferred
-   wave's diff, not just its own.
+   is outstanding, and whichever swarm clears it must cover every deferred
+   swarm's diff, not just its own.
    The Reviewer does **not** re-run `config.test` — it reads
-   `.beehive/wave-N/tests.log` from step 3 (same tree, minutes old) and
+   `.beehive/swarm-N/tests.log` from step 3 (same tree, minutes old) and
    judges the diff. The Verifier re-runs `config.test` only if it has a
    concrete reason to distrust the log; its own job is the end-to-end
-   exercise, which nothing else does. One full-suite tokenization per wave,
+   exercise, which nothing else does. One full-suite tokenization per swarm,
    not three.
    Any finding above trivial → Builder (same one, warm — step 1) → back to
    step 3. **The recheck gate is derived from the fix diff, not the phase.**
@@ -420,11 +420,11 @@ verify | blocked | merged` — so a resuming agent knows where the wave stopped.
    The liveness rule in step 1 applies here too — a fresh Reviewer or
    Verifier can die mid-check as easily as a Builder can, and gets the same
    active resume-and-track treatment, not a silent wait.
-5. **Gate** — Coordinator writes `.beehive/wave-N/report.md`, starting with
+5. **Gate** — Coordinator writes `.beehive/swarm-N/report.md`, starting with
    a parseable front-matter block, then the prose body:
    ```
    ---
-   wave: N
+   swarm: N
    phases: [P0, P3]
    percent: 62
    status: passed        # passed | blocked
@@ -440,29 +440,29 @@ verify | blocked | merged` — so a resuming agent knows where the wave stopped.
    human's optional deep check. Patches `digest.md` with what changed
    (§digest). Updates `.beehive/progress.md` (§Progress). `tokens`,
    `mechanisms`, `resume`, and `stuck` are explained in §Report, below.
-   `mode: autobuild` → merge `wave-N-int` to the working branch (it passed
-   the test gate), then start wave N+1's **Build** immediately, in the same
-   turn as writing the report, while this wave's Review+Verify run *in
+   `mode: autobuild` → merge `swarm-N-int` to the working branch (it passed
+   the test gate), then start swarm N+1's **Build** immediately, in the same
+   turn as writing the report, while this swarm's Review+Verify run *in
    parallel* — they don't edit code, so a finding just feeds back as a fix
    on the already-merged phase. Do **not** post the report and wait for the
-   user to tell you to continue — activating wave N+1 is automatic. Guard:
-   if wave N has a `full` gate, N+1 may **build** in parallel but must not
+   user to tell you to continue — activating swarm N+1 is automatic. Guard:
+   if swarm N has a `full` gate, N+1 may **build** in parallel but must not
    **merge** until N's Verify passes — the Coordinator waits on the Verifier
    agent for this, not on the user — so nothing compounds on an unverified
    foundation. Stop only on an unrecoverable block. `mode: review` → wait
    for approval.
-   On a long run (4+ waves) the Coordinator's own context grows every wave —
+   On a long run (4+ swarms) the Coordinator's own context grows every swarm —
    every dispatch prompt, every notification, every report it wrote. It may
-   **drop that context between waves and resume from `.beehive/`**
+   **drop that context between swarms and resume from `.beehive/`**
    (§Resuming): `progress.md`, the newest report front-matter,
-   `wave-N/status`. It holds no state the files don't. This caps the
-   Coordinator's cost at roughly one wave's worth instead of the whole run's.
+   `swarm-N/status`. It holds no state the files don't. This caps the
+   Coordinator's cost at roughly one swarm's worth instead of the whole run's.
 
 ---
 
 ## Progress
 
-After every wave's gate the Coordinator recomputes project completion and
+After every swarm's gate the Coordinator recomputes project completion and
 appends one line to `.beehive/progress.md`. This is the "how much is done"
 signal — it replaces stopping to ask the human.
 
@@ -471,7 +471,7 @@ Each phase in `phase-spec.md` carries a `weight` (integer, relative effort —
 because phases are uneven:
 
 ```
-done      = Σ weight[p] for phases past their wave's gate (step 5)
+done      = Σ weight[p] for phases past their swarm's gate (step 5)
 building  = Σ weight[p] for phases merged but whose gate hasn't cleared  (× 0.6)
 total     = Σ weight[p] for all phases
 percent   = round( 100 * (done + 0.6 * building) / total )
@@ -480,10 +480,10 @@ percent   = round( 100 * (done + 0.6 * building) / total )
 `progress.md` line format:
 
 ```
-wave 2 · 2026-08-30 14:07 · P1,P2,P3 done · P4 building · 47% · next: wave 3 (P4)
+swarm 2 · 2026-08-30 14:07 · P1,P2,P3 done · P4 building · 47% · next: swarm 3 (P4)
 ```
 
-On the final wave, the last line reads `100% · complete`.
+On the final swarm, the last line reads `100% · complete`.
 
 ---
 
@@ -493,17 +493,17 @@ On the final wave, the last line reads `100% · complete`.
 actually behaved the way the protocol claims — that a `risk: empirical`
 phase was really spiked, that the Verifier really ran on the cheap model,
 that the Reviewer didn't quietly re-tokenize the whole suite. Two more
-fields on the wave report (§ACT 3 step 5) close that gap, best-effort —
+fields on the swarm report (§ACT 3 step 5) close that gap, best-effort —
 leave a field out or `n/a` rather than guess:
 
-- **`tokens`** — per role, this wave's token usage, if the platform
+- **`tokens`** — per role, this swarm's token usage, if the platform
   surfaces it (`ADAPTERS.md` has the mechanics). This is where the cost
   actually went, not an estimate from phase `weight`. A number sourced from
   a crash's resume call — where the resume reports only its own cost after
   the real pass had already finished before the crash notice arrived — is
   not the pass's true cost; flag it as unreliable in the report body rather
   than folding it into the total silently.
-- **`mechanisms`** — what the Coordinator actually did this wave, not what
+- **`mechanisms`** — what the Coordinator actually did this swarm, not what
   the spec says it should do: which phases' `risk: empirical` spike ran
   (`spiked`), whether routing actually followed §Speed lever 9 — `strong`
   only for full-gate Reviewers and `risk: empirical` Builders, `cheap` for
@@ -513,26 +513,26 @@ leave a field out or `n/a` rather than guess:
   checkpointed their output instead of writing once at the end
   (`checkpointed`), and how many Builders ran at once (`staggered`). The
   Coordinator fills this from its own actions — it needs no extra
-  inspection. A lever reading `false`/`0` across several waves is a signal
+  inspection. A lever reading `false`/`0` across several swarms is a signal
   the config or the Coordinator is skipping it, not that it doesn't apply.
-- **`resume`** — per role that crashed this wave, how many crash→resume
+- **`resume`** — per role that crashed this swarm, how many crash→resume
   cycles it went through (§ACT 3 step 1). Roles that never crashed are
   omitted, not listed at `0`. This is the field that turns "a Builder that
   dies mid-phase is resumed" from an assumption into something the human
   can audit without reconstructing it from session logs after the fact.
 - **`stuck`** — roles that crashed and, despite an active resume attempt
-  (not just waiting), never came back. Non-empty `stuck` means the wave
+  (not just waiting), never came back. Non-empty `stuck` means the swarm
   cannot report `status: passed` — a stuck Builder means unmerged work, a
   stuck Reviewer/Verifier means an ungated one, and moving on with either
   quietly is exactly the failure mode this field exists to stop. `blocked`
   with the stuck role named, same as any other unresolved gate.
 
-On the final wave, after the last `progress.md` line, the Coordinator
-writes `.beehive/summary.md`: `tokens` summed per role across every wave,
-every wave's `mechanisms` merged into one run-wide checklist, and every
+On the final swarm, after the last `progress.md` line, the Coordinator
+writes `.beehive/summary.md`: `tokens` summed per role across every swarm,
+every swarm's `mechanisms` merged into one run-wide checklist, and every
 `resume`/`stuck` entry carried forward — so a run that needed several
 crash recoveries to finish shows that plainly, instead of just `100% ·
-complete`. One file the human reads once, instead of opening every wave
+complete`. One file the human reads once, instead of opening every swarm
 report.
 
 ---
@@ -550,7 +550,7 @@ ceiling:
 
 1. **Phase 0 contracts** (§Phase 0) — the single biggest one. Move every
    shared type/schema/signature into one small early phase so the rest
-   `depends_on: [0]` and fan out into one wave instead of a chain.
+   `depends_on: [0]` and fan out into one swarm instead of a chain.
 2. **Merge phases that collide only on a `hot_file`.** If P3 and P4 both
    depend only on P0 and are serialized *purely* because they edit the same
    big file, hand both to **one** Builder as a combined phase — one pass
@@ -564,14 +564,14 @@ ceiling:
    for the `weight: 5+` phases. And a fix-recheck is gated by the *fix*, not
    the phase — a copy tweak doesn't earn a second full Verifier pass. A
    **leaf phase** — nothing later `depends_on` it — can take this further
-   than "lighter": deferred, folded entirely into a later wave's gate,
+   than "lighter": deferred, folded entirely into a later swarm's gate,
    because there is no downstream build left that can inherit a bug it
    hasn't caught yet (§ACT 3 step 4 has the mechanics and the guardrail). A
-   phase anything later depends on keeps its own wave's gate regardless of
+   phase anything later depends on keeps its own swarm's gate regardless of
    weight — deferring *that* one is the "review everything at the end"
    pattern below, not this lever.
-5. **Pipelined gates** (§ACT 3 step 5) — Review/Verify of wave N overlap
-   the build of wave N+1.
+5. **Pipelined gates** (§ACT 3 step 5) — Review/Verify of swarm N overlap
+   the build of swarm N+1.
 6. **Tight inner loop** — `config.test_quick` while a Builder iterates,
    full suite only at the gate.
 7. **`digest.md`** — one exploration shared by every role instead of each
@@ -597,27 +597,27 @@ ceiling:
    `default` pays the strong-model rate for every curl-and-paste Verifier
    *and* every routine Builder. Doesn't cut token *count*, cuts cost.
 10. **Stagger concurrency on a metered plan.** N concurrent Builders burn
-    ~N× the token rate; a rate-limit mid-wave costs more than the
+    ~N× the token rate; a rate-limit mid-swarm costs more than the
     parallelism saved, and a rate-limited Reviewer/Verifier is *pure* loss
     (no artifact until it finishes). Widen the graph at spec time, but run
-    ~2–3 agents at once, not the whole wave width (§ACT 3 step 1 — spawn up
-    to the cap, backfill the rest as slots free, never the whole wave at
+    ~2–3 agents at once, not the whole swarm width (§ACT 3 step 1 — spawn up
+    to the cap, backfill the rest as slots free, never the whole swarm at
     once). Reviewer and Verifier checkpoint their output as they go
     (§Economy) so a killed one resumes. A crash attributable to a spend/rate
     limit is a signal to cut the cap further for the rest of the run, not
     just to resume at the same width — a real run that lost 4 agents (3
     Builders and a Reviewer) to one simultaneous limit hit dropped to one
     agent at a time for everything after. Record the new cap as a dated note
-    in `digest.md` (alongside `models.cheap`-style decisions) so later waves
+    in `digest.md` (alongside `models.cheap`-style decisions) so later swarms
     inherit it without re-deciding. **If crashes cluster at spawn or first
-    resume rather than spread through a wave's runtime** (one run: 10 of 14),
+    resume rather than spread through a swarm's runtime** (one run: 10 of 14),
     the trigger is likely the *simultaneity* of the spawn moment, not
     sustained concurrent width — stagger the dispatches themselves (a beat
     between each `Agent` call in a batch), not just a lower cap.
 
 What does **not** help: adding builders to an existing chain (they idle),
 or "build everything then review once at the end" (late-caught foundation
-bugs force rework of everything above them — the per-wave gate is the cheap
+bugs force rework of everything above them — the per-swarm gate is the cheap
 place to catch them; a **leaf** phase is the one exception, lever 4, since it
 has no "everything above it" left to protect). The de-risk equivalent:
 committing a full Builder→Reviewer→Verifier cycle to a phase whose approach
@@ -654,7 +654,7 @@ report, not volume.
   not one per agent. A Builder additionally opens the specific files in its
   `touches`; it does not take a repo tour. `config.context` stays short.
 - **Reviewer sees the diff, not the files.** `git diff
-  <working-branch>...wave-N-int`, plus `digest.md` and the spec — never the
+  <working-branch>...swarm-N-int`, plus `digest.md` and the spec — never the
   full source of every touched file.
 - **Don't re-tokenize an unchanged test run.** The gate ran `config.test`
   and saved `tests.log`. The Reviewer reads that file; it does not re-run
@@ -667,7 +667,7 @@ report, not volume.
   partial file instead of starting over.
 - **Notes are bounded.** Builder note ≤15 lines. Reviewer findings are
   one-liners: `severity · file:line · problem · fix` — never restate the
-  spec back. Verifier gives evidence, not narrative. Wave report is the
+  spec back. Verifier gives evidence, not narrative. Swarm report is the
   fixed shape in §ACT 3 step 5, nothing added.
 - **No unrequested prose.** If an explanation is longer than the code it
   defends, cut it. Explanation the human asked for (this protocol's reports,
@@ -695,7 +695,7 @@ report, not volume.
 
 ## Invariant rules
 
-- Two phases sharing a `hot_file` never share a wave (unless merged into one
+- Two phases sharing a `hot_file` never share a swarm (unless merged into one
   phase for one Builder — §Speed lever 2).
 - Never advance past a failing `config.test` command.
 - Reviewer and Verifier never share context with a Builder.
@@ -708,21 +708,21 @@ report, not volume.
 - Review/verify findings return to the Builder that wrote the phase, context
   intact — cold-start a fix Builder only if the original is unrecoverable.
 - A crashed role is actively resumed and tracked (`resume` / `stuck` in the
-  wave report), never silently left — a wave cannot report `status: passed`
+  swarm report), never silently left — a swarm cannot report `status: passed`
   while any role is `stuck`.
-- A deferred gate (§Speed lever 4) is recorded in `wave-plan.md`, not
+- A deferred gate (§Speed lever 4) is recorded in `swarm-plan.md`, not
   silent — the run cannot report `100% · complete` while one is still
-  outstanding, and whatever wave clears it must cover every deferred wave's
+  outstanding, and whatever swarm clears it must cover every deferred swarm's
   diff, not just its own.
 - Coordinator-authored code (§Roles exception) is not exempt from a gate —
-  it must fall inside a wave whose Review/Verify still covers it, same as
+  it must fall inside a swarm whose Review/Verify still covers it, same as
   any Builder's diff.
 - Test results are pasted as raw output, never summarized as "passed".
 - All cross-role handoff goes through `.beehive/` files.
-- The final wave is docs/polish, alone.
+- The final swarm is docs/polish, alone.
 - In `autobuild` the Coordinator never asks the user to confirm, approve, or
-  "activate" a wave — not after the spec, not after the plan, not after a
-  wave report, not between phases. Wave activation is automatic; the run
+  "activate" a swarm — not after the spec, not after the plan, not after a
+  swarm report, not between phases. Swarm activation is automatic; the run
   halts only on an unrecoverable block.
 
 ---
@@ -737,13 +737,13 @@ No `phase-spec.md` yet → resume Act 1: if `.beehive/questions.md` holds the
 human's answers, feed them to the Interviewer for its next round; otherwise
 start intake fresh.
 
-Otherwise read the front-matter of `.beehive/wave-*/report.md` newest-first
-(cheap — `wave / phases / percent / status / blockers`) and the newest
-wave's `status` file (`building | integrating | testing | review | verify |
+Otherwise read the front-matter of `.beehive/swarm-*/report.md` newest-first
+(cheap — `swarm / phases / percent / status / blockers`) and the newest
+swarm's `status` file (`building | integrating | testing | review | verify |
 blocked | merged`). Open a report's prose body only when you need the
 detail. `progress.md` is the one-line history. The agent holds no state —
 everything is on disk.
 
 Because of this, a Coordinator on a long run can deliberately resume this
-way between waves (§ACT 3 step 5) to keep its own context from growing with
-every wave — not only after a crash.
+way between swarms (§ACT 3 step 5) to keep its own context from growing with
+every swarm — not only after a crash.

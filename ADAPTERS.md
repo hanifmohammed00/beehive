@@ -3,19 +3,19 @@
 Mechanics for running the protocol's roles inside Claude Code: **(a)** a
 Builder scoped to one phase, **(b)** a Reviewer and Verifier that are fresh
 instances with no exposure to the Builder, **(c)** parallel Builders when a
-wave is wide. Everything else is plain git + shell + files.
+swarm is wide. Everything else is plain git + shell + files.
 
 ---
 
 - **Coordinator**: the main session, or `/beehive` (skill wrapper reads
   `config.yml` and runs the Coordinator role).
 - **Builder**: `Agent` tool, `subagent_type: general-purpose`, one call per
-  phase. Parallel builders in one wave → `isolation: "worktree"` +
+  phase. Parallel builders in one swarm → `isolation: "worktree"` +
   `run_in_background: true`, then collect. `model: {models.strong}` for a
   `risk: empirical` phase, `model: {models.cheap}` for every routine phase
   (§Speed lever 9 — resolve this per-phase, not one blanket model for every
-  Builder in the wave). On a metered plan, dispatch ~2–3 at a time rather
-  than the whole wave width — a rate-limit mid-wave costs more than the
+  Builder in the swarm). On a metered plan, dispatch ~2–3 at a time rather
+  than the whole swarm width — a rate-limit mid-swarm costs more than the
   parallelism saved, and a rate-limited Reviewer/Verifier (no artifact until
   it finishes) is a total loss paid twice.
   - **Before a batched dispatch, confirm distinctness — not after.** A real
@@ -28,16 +28,16 @@ wave is wide. Everything else is plain git + shell + files.
     worktree paths just created and check they're actually distinct;
     checking after dispatch is checking too late.
   - A `risk: empirical` phase: the Builder's first deliverable is the spike
-    script + `.beehive/wave-N/spike-K.md`, before the real build.
+    script + `.beehive/swarm-N/spike-K.md`, before the real build.
   - If `isolation: "worktree"` isn't available (it needs VCS hooks the
     environment may not have), fall back to **manual worktrees**: the
-    Coordinator runs `git worktree add -b wave-N/phase-K <dir> <base>` per
+    Coordinator runs `git worktree add -b swarm-N/phase-K <dir> <base>` per
     phase and passes each Builder its `<dir>`. Symlink the gitignored build
     deps into each worktree first (`ln -s <repo>/backend/.venv <dir>/backend/.venv`,
     same for `node_modules`) or tests won't run. Background subagents are
     still fresh contexts, so isolation holds. Remove the worktrees
     (`git worktree remove --force`) and delete the merged branches after
-    each wave.
+    each swarm.
   - **Resuming a dead Builder, or feeding back fix findings**: `SendMessage`
     to the same subagent — its context and its partial work on the branch
     are intact. A fresh `Agent` call starts cold and re-explores the phase,
@@ -47,12 +47,12 @@ wave is wide. Everything else is plain git + shell + files.
   - **Detecting a dead role, not just resuming one.** A background `Agent`
     call's completion notification is not guaranteed if the subagent's
     session dies outright — silence is not evidence it's still working.
-    Don't wait indefinitely: if a wave's `status` hasn't advanced and no new
+    Don't wait indefinitely: if a swarm's `status` hasn't advanced and no new
     `build/phase-K.md` / `review.md` / `verify.md` line has appeared in
     longer than the phase would plausibly take, use `ListAgents` to check
     whether the subagent is still addressable. If it is, `SendMessage` to
     resume it; if it's gone, cold-start a fix instance per the rule above.
-    Log each crash and its outcome into the wave report's `resume` field
+    Log each crash and its outcome into the swarm report's `resume` field
     (§Report) as it happens — a role that never comes back is `stuck` and
     blocks the gate. From one real run: of 7 role instances that crashed,
     the 5 running on an inherited model all resumed cleanly, while all 4
@@ -68,19 +68,19 @@ wave is wide. Everything else is plain git + shell + files.
   Verifier and standard-gate Reviewer take `model: {models.cheap}` — pass
   it explicitly on the `Agent` call's `model` parameter; a `light` gate has
   no separate Reviewer agent, so there's no third case to handle. Point
-  them at `wave-N-int` (the integration branch) / its diff — or, if this
-  gate is also covering a deferred earlier wave (`PROTOCOL.md` §ACT 3 step
+  them at `swarm-N-int` (the integration branch) / its diff — or, if this
+  gate is also covering a deferred earlier swarm (`PROTOCOL.md` §ACT 3 step
   4, §Speed lever 4), diff from the branch point *before* that deferred
-  wave instead of its immediate parent, so those phases are actually in
+  swarm instead of its immediate parent, so those phases are actually in
   scope and not silently excluded because they already merged.
 - **Concurrent tests**: run the `config.test` commands as parallel
   background `Bash` calls, then read both results.
 - **Heavy review**: the human runs `config.heavy_review` (e.g.
-  `/code-review ultra`); the Coordinator only names it in the wave report.
-- **Wave-to-wave (autobuild)**: after writing a wave report the Coordinator
-  issues the next wave's `Agent` calls in the same turn. It does not end its
+  `/code-review ultra`); the Coordinator only names it in the swarm report.
+- **Swarm-to-swarm (autobuild)**: after writing a swarm report the Coordinator
+  issues the next swarm's `Agent` calls in the same turn. It does not end its
   turn to let the user say "continue" — there is no confirmation step
-  between waves. The turn ends only at completion or an unrecoverable block.
+  between swarms. The turn ends only at completion or an unrecoverable block.
 - **Token/mechanism reporting (§Report)**: `mechanisms` needs no platform
   support — the Coordinator fills it from what it actually did (which model
   it dispatched each agent on, whether a spike ran, whether it told the
